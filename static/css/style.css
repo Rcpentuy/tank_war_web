@@ -199,3 +199,34 @@ button {
   left: 0;
   pointer-events: none;
 }
+
+#joinForm {
+  background-color: white;
+  padding: 20px;
+  border-radius: 10px;
+  box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+}
+
+#playerName {
+  display: block;
+  width: 200px;
+  padding: 10px;
+  margin-bottom: 10px;
+  border: 1px solid #ccc;
+  border-radius: 5px;
+}
+
+#joinButton {
+  display: block;
+  width: 100%;
+  padding: 10px;
+  background-color: #4caf50;
+  color: white;
+  border: none;
+  border-radius: 5px;
+  cursor: pointer;
+}
+
+#joinButton:hover {
+  background-color: #45a049;
+}

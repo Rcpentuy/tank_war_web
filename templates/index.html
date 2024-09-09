@@ -23,9 +23,19 @@
       <div id="playerCount"></div>
     </div>
 
-    <div id="joinForm" style="display: none">
+    <div
+      id="joinForm"
+      style="
+        display: block;
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        z-index: 1000;
+      "
+    >
       <input type="text" id="playerName" placeholder="输入你的名字" />
-      <button onclick="joinGame()">加入游戏</button>
+      <button id="joinButton">加入游戏</button>
     </div>
 
     <div id="changeNameForm" style="display: none">

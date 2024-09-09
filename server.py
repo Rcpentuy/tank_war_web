@@ -208,8 +208,11 @@ def handle_player_move(data):
 
     speed = 2
     player['angle'] = data['angle']
+    player['moving'] = data['moving']
 
-    if data['moving']:
+    print(f"Player {player_id} move: angle={data['angle']}, moving={data['moving']}")
+
+    if player['moving']:
         dx = math.cos(player['angle']) * speed
         dy = math.sin(player['angle']) * speed
         new_x = player['x'] + dx
@@ -221,8 +224,12 @@ def handle_player_move(data):
         if not any(circle_rectangle_collision(new_x, new_y, tank_radius, wall) for wall in walls):
             player['x'] = new_x
             player['y'] = new_y
+            print(f"Player {player_id} new position: x={new_x}, y={new_y}")
+        else:
+            print(f"Player {player_id} collision detected")
 
     emit('player_updated', {'id': player_id, 'data': player}, broadcast=True)
+    print(f"Emitted player_updated for {player_id}: {player}")
 
 @socketio.on('fire')
 def handle_fire():
@@ -230,6 +237,8 @@ def handle_fire():
     player = players[player_id]
     if not player['alive']:
         return
+    
+    print(f"Player {player_id} fired a bullet")
     
     # 坦克中心到炮口的距离
     barrel_length = 20 / 1.2  # 可以根据实际坦克大小调整
@@ -243,9 +252,10 @@ def handle_fire():
         'y': bullet_start_y,
         'angle': player['angle'],
         'owner': player_id,
-        'bounces': 0  # 添加反弹次数计数
+        'bounces': 0
     }
     bullets.append(bullet)
+    print(f"Bullet created: {bullet}")
 
 def update_game():
     for bullet in bullets[:]:
@@ -277,15 +287,25 @@ def update_game():
             if player['alive']:
                 if point_in_rectangle(bullet['x'], bullet['y'], player['x'] - TANK_WIDTH/2, player['y'] - TANK_HEIGHT/2, TANK_WIDTH, TANK_HEIGHT):
                     player['alive'] = False
-                    socketio.emit('player_killed', {'id': player_id, 'x': player['x'], 'y': player['y']}, namespace='/')
+                    game_over, winner = check_winner()
+                    socketio.emit('player_killed', {
+                        'id': player_id, 
+                        'x': player['x'], 
+                        'y': player['y'],
+                        'gameOver': game_over,
+                        'winner': winner['name'] if winner else None
+                    }, namespace='/')
                     bullets.remove(bullet)
-                    check_winner()  # 移动到这里，只在玩家被击败时检查获胜者
+                    if game_over:
+                        # 延迟发送游戏结束事件
+                        socketio.emit('game_over', {'wins': wins}, namespace='/', callback=lambda: socketio.sleep(1))
                     break
         
         if bullet['bounces'] >= 10 or not (0 <= bullet['x'] <= GAME_WIDTH and 0 <= bullet['y'] <= GAME_HEIGHT):
             bullets.remove(bullet)
     
     socketio.emit('update_bullets', bullets, namespace='/')
+    print(f"Emitted update_bullets with {len(bullets)} bullets")
 
 def line_rectangle_intersection(x1, y1, x2, y2, rect):
     left = rect['x']
@@ -364,10 +384,12 @@ def check_winner():
     if len(players) > 1 and len(alive_players) == 1:
         winner = alive_players[0]
         winner_id = next(id for id, player in players.items() if player == winner)
-        wins[winner_id] += 1  # 只在这里增加胜利次数
-        socketio.emit('game_over', {'winner': winner['name'], 'wins': wins}, namespace='/')
+        wins[winner_id] += 1
+        return True, winner
     elif len(players) == 1:
         socketio.emit('waiting_for_players', {'count': len(players)}, namespace='/')
+        return False, None
+    return False, None
 
 def game_loop():
     while True:
@@ -392,4 +414,4 @@ def handle_restart_game():
 if __name__ == '__main__':
     generate_walls()
     socketio.start_background_task(target=game_loop)
-    socketio.run(app, debug=True)
+    socketio.run(app, host='0.0.0.0', port=25000, debug=True)
