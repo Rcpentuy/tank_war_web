@@ -2,6 +2,7 @@ from flask import Flask, render_template, request, jsonify, send_from_directory
 from flask_socketio import SocketIO, emit
 import random
 import math
+from threading import Thread
 
 app = Flask(__name__, static_folder='static')
 socketio = SocketIO(app, async_mode='threading')
@@ -57,7 +58,7 @@ def generate_maze(width, height):
     return maze
 
 def generate_walls():
-    global walls
+    global walls, maze_info
     maze = generate_maze(MAZE_WIDTH, MAZE_HEIGHT)
     walls = []
     
@@ -95,13 +96,15 @@ def generate_walls():
     ])
 
     # 将迷宫信息添加到全局变量中
-    global maze_info
     maze_info = {
         'width': maze_actual_width,
         'height': maze_actual_height,
         'offset_x': offset_x,
         'offset_y': offset_y
     }
+
+# 在文件顶部，全局变量声明之后添加这行
+generate_walls()
 
 def reset_game():
     global players, bullets
@@ -112,6 +115,10 @@ def reset_game():
     socketio.emit('game_reset', {'walls': walls, 'players': players, 'maze_info': maze_info, 'wins': wins}, namespace='/')
 
 def respawn_player(player_id):
+    global maze_info
+    if not maze_info:
+        generate_walls()  # 如果 maze_info 为空，重新生成墙壁
+    
     maze_start_x = maze_info['offset_x']
     maze_start_y = maze_info['offset_y']
     maze_end_x = maze_start_x + maze_info['width']
@@ -144,10 +151,14 @@ def circle_rectangle_collision(circle_x, circle_y, circle_radius, rect):
     distance_y = circle_y - closest_y
     distance_squared = distance_x**2 + distance_y**2
     
-    return distance_squared < circle_radius**2
+    return distance_squared <= circle_radius**2
 
 @socketio.on('player_join')
 def handle_player_join(data):
+    global maze_info
+    if not maze_info:
+        generate_walls()  # 如果 maze_info 为空，重新生成墙壁
+    
     player_id = request.sid
     if player_id in players:
         # 玩家已经存在，可能是重新连接
@@ -210,7 +221,7 @@ def handle_player_move(data):
     player['angle'] = data['angle']
     player['moving'] = data['moving']
 
-    print(f"Player {player_id} move: angle={data['angle']}, moving={data['moving']}")
+    # print(f"Player {player_id} move: angle={data['angle']}, moving={data['moving']}")
 
     if player['moving']:
         dx = math.cos(player['angle']) * speed
@@ -229,19 +240,19 @@ def handle_player_move(data):
             print(f"Player {player_id} collision detected")
 
     emit('player_updated', {'id': player_id, 'data': player}, broadcast=True)
-    print(f"Emitted player_updated for {player_id}: {player}")
+    # print(f"Emitted player_updated for {player_id}: {player}")
 
 @socketio.on('fire')
 def handle_fire():
     player_id = request.sid
-    player = players[player_id]
-    if not player['alive']:
+    if player_id not in players or not players[player_id]['alive']:
         return
     
+    player = players[player_id]
     print(f"Player {player_id} fired a bullet")
     
     # 坦克中心到炮口的距离
-    barrel_length = 20 / 1.2  # 可以根据实际坦克大小调整
+    barrel_length = max(TANK_WIDTH, TANK_HEIGHT) / 2 + 5  # 确保子弹在坦克外部生成
     
     # 计算炮口位置
     bullet_start_x = player['x'] + math.cos(player['angle']) * barrel_length
@@ -256,125 +267,89 @@ def handle_fire():
     }
     bullets.append(bullet)
     print(f"Bullet created: {bullet}")
+    socketio.emit('update_bullets', bullets, namespace='/')
+
+def reflect_bullet(bullet, wall):
+    # 计算墙壁的法线向量
+    if wall['width'] > wall['height']:  # 水平墙
+        normal = (0, 1)
+    else:  # 垂直墙
+        normal = (1, 0)
+    
+    # 计算入射向量
+    incident = (math.cos(bullet['angle']), math.sin(bullet['angle']))
+    
+    # 计算反射向量
+    dot_product = incident[0]*normal[0] + incident[1]*normal[1]
+    reflected = (
+        incident[0] - 2 * dot_product * normal[0],
+        incident[1] - 2 * dot_product * normal[1]
+    )
+    
+    # 更新子弹角度
+    bullet['angle'] = math.atan2(reflected[1], reflected[0])
+    
+    # 将子弹稍微移出墙壁
+    offset = 1  # 1像素的偏移
+    bullet['x'] += normal[0] * offset
+    bullet['y'] += normal[1] * offset
 
 def update_game():
-    for bullet in bullets[:]:
+    global bullets
+    bullets_to_remove = []
+    for bullet in bullets:
         speed = 5
-        old_x, old_y = bullet['x'], bullet['y']
-        new_x = old_x + math.cos(bullet['angle']) * speed
-        new_y = old_y + math.sin(bullet['angle']) * speed
+        dx = math.cos(bullet['angle']) * speed
+        dy = math.sin(bullet['angle']) * speed
         
-        # 检查墙壁碰撞
-        collision = False
-        for wall in walls:
-            if line_rectangle_intersection(old_x, old_y, new_x, new_y, wall):
-                collision = True
-                collision_point = line_rectangle_intersection_point(old_x, old_y, new_x, new_y, wall)
-                if collision_point:
-                    new_x, new_y = collision_point
-                    # 计算反弹角度
-                    if abs(new_x - wall['x']) < 1 or abs(new_x - (wall['x'] + wall['width'])) < 1:
-                        bullet['angle'] = math.pi - bullet['angle']
-                    else:
-                        bullet['angle'] = -bullet['angle']
-                bullet['bounces'] += 1
+        # 使用多个中间点进行碰撞检测
+        steps = 5
+        for i in range(1, steps + 1):
+            new_x = bullet['x'] + dx * i / steps
+            new_y = bullet['y'] + dy * i / steps
+            
+            collision = False
+            for wall in walls:
+                if circle_rectangle_collision(new_x, new_y, 2, wall):  # 给子弹一个2像素的半径
+                    collision = True
+                    reflect_bullet(bullet, wall)
+                    bullet['bounces'] += 1
+                    break
+            
+            if collision:
                 break
         
-        bullet['x'], bullet['y'] = new_x, new_y
+        if not collision:
+            bullet['x'] += dx
+            bullet['y'] += dy
         
         # 检查玩家碰撞
         for player_id, player in players.items():
             if player['alive']:
-                if point_in_rectangle(bullet['x'], bullet['y'], player['x'] - TANK_WIDTH/2, player['y'] - TANK_HEIGHT/2, TANK_WIDTH, TANK_HEIGHT):
+                if circle_rectangle_collision(bullet['x'], bullet['y'], 3, {
+                    'x': player['x'] - TANK_WIDTH/2,
+                    'y': player['y'] - TANK_HEIGHT/2,
+                    'width': TANK_WIDTH,
+                    'height': TANK_HEIGHT
+                }):
                     player['alive'] = False
+                    bullets_to_remove.append(bullet)
+                    socketio.emit('player_killed', {'id': player_id, 'x': player['x'], 'y': player['y']}, namespace='/')
                     game_over, winner = check_winner()
-                    socketio.emit('player_killed', {
-                        'id': player_id, 
-                        'x': player['x'], 
-                        'y': player['y'],
-                        'gameOver': game_over,
-                        'winner': winner['name'] if winner else None
-                    }, namespace='/')
-                    bullets.remove(bullet)
                     if game_over:
-                        # 延迟发送游戏结束事件
-                        socketio.emit('game_over', {'wins': wins}, namespace='/', callback=lambda: socketio.sleep(1))
+                        socketio.emit('game_over', {'winner': winner['name'], 'wins': wins}, namespace='/')
                     break
         
+        # 检查子弹是否超出游戏区域或反弹次数过多
         if bullet['bounces'] >= 10 or not (0 <= bullet['x'] <= GAME_WIDTH and 0 <= bullet['y'] <= GAME_HEIGHT):
+            bullets_to_remove.append(bullet)
+    
+    # 移除需要删除的子弹
+    for bullet in bullets_to_remove:
+        if bullet in bullets:
             bullets.remove(bullet)
     
     socketio.emit('update_bullets', bullets, namespace='/')
-    print(f"Emitted update_bullets with {len(bullets)} bullets")
-
-def line_rectangle_intersection(x1, y1, x2, y2, rect):
-    left = rect['x']
-    right = rect['x'] + rect['width']
-    top = rect['y']
-    bottom = rect['y'] + rect['height']
-    
-    if (x1 <= left and x2 <= left) or (x1 >= right and x2 >= right) or (y1 <= top and y2 <= top) or (y1 >= bottom and y2 >= bottom):
-        return False
-    
-    m = (y2 - y1) / (x2 - x1) if x2 != x1 else float('inf')
-    b = y1 - m * x1 if x2 != x1 else 0
-    
-    if x1 != x2:
-        t_left = (left - x1) / (x2 - x1)
-        t_right = (right - x1) / (x2 - x1)
-        y_left = m * left + b
-        y_right = m * right + b
-        if 0 <= t_left <= 1 and top <= y_left <= bottom:
-            return True
-        if 0 <= t_right <= 1 and top <= y_right <= bottom:
-            return True
-    
-    if y1 != y2:
-        t_top = (top - y1) / (y2 - y1)
-        t_bottom = (bottom - y1) / (y2 - y1)
-        x_top = (top - b) / m if m != 0 else x1
-        x_bottom = (bottom - b) / m if m != 0 else x1
-        if 0 <= t_top <= 1 and left <= x_top <= right:
-            return True
-        if 0 <= t_bottom <= 1 and left <= x_bottom <= right:
-            return True
-    
-    return False
-
-def line_rectangle_intersection_point(x1, y1, x2, y2, rect):
-    left = rect['x']
-    right = rect['x'] + rect['width']
-    top = rect['y']
-    bottom = rect['y'] + rect['height']
-    
-    m = (y2 - y1) / (x2 - x1) if x2 != x1 else float('inf')
-    b = y1 - m * x1 if x2 != x1 else 0
-    
-    intersections = []
-    
-    if x1 != x2:
-        t_left = (left - x1) / (x2 - x1)
-        t_right = (right - x1) / (x2 - x1)
-        y_left = m * left + b
-        y_right = m * right + b
-        if 0 <= t_left <= 1 and top <= y_left <= bottom:
-            intersections.append((left, y_left))
-        if 0 <= t_right <= 1 and top <= y_right <= bottom:
-            intersections.append((right, y_right))
-    
-    if y1 != y2:
-        t_top = (top - y1) / (y2 - y1)
-        t_bottom = (bottom - y1) / (y2 - y1)
-        x_top = (top - b) / m if m != 0 else x1
-        x_bottom = (bottom - b) / m if m != 0 else x1
-        if 0 <= t_top <= 1 and left <= x_top <= right:
-            intersections.append((x_top, top))
-        if 0 <= t_bottom <= 1 and left <= x_bottom <= right:
-            intersections.append((x_bottom, bottom))
-    
-    if intersections:
-        return min(intersections, key=lambda p: (p[0] - x1)**2 + (p[1] - y1)**2)
-    return None
 
 def point_in_rectangle(px, py, rx, ry, rw, rh):
     return rx <= px <= rx + rw and ry <= py <= ry + rh
@@ -391,13 +366,13 @@ def check_winner():
         return False, None
     return False, None
 
-def game_loop():
+def start_game_loop():
     while True:
         socketio.sleep(1/60)  # 60 FPS
-        try:
-            update_game()
-        except Exception as e:
-            print(f"Error in game loop: {e}")
+        update_game()
+
+def run_game_loop():
+    Thread(target=start_game_loop).start()
 
 @socketio.on('restart_game')
 def handle_restart_game():
@@ -413,5 +388,5 @@ def handle_restart_game():
 
 if __name__ == '__main__':
     generate_walls()
-    socketio.start_background_task(target=game_loop)
-    socketio.run(app, host='0.0.0.0', port=25000, debug=True)
+    run_game_loop()
+    socketio.run(app, host='0.0.0.0', port=25000, debug=False)

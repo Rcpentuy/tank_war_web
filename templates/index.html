@@ -12,17 +12,6 @@
       <!-- SVG 将在 JavaScript 中动态创建 -->
     </div>
 
-    <div id="gameInfo" style="display: none">
-      <div id="playerInfoContainer">
-        <div id="playerInfo"></div>
-        <button id="changeNameButton" onclick="showChangeNameForm()">
-          更改名字
-        </button>
-      </div>
-      <div id="scoreBoard"></div>
-      <div id="playerCount"></div>
-    </div>
-
     <div
       id="joinForm"
       style="
@@ -36,6 +25,19 @@
     >
       <input type="text" id="playerName" placeholder="输入你的名字" />
       <button id="joinButton">加入游戏</button>
+    </div>
+
+    <div id="gameInfo" style="display: none">
+      <div id="playerInfoContainer">
+        <div id="playerInfo">
+          玩家名: <span id="playerNameDisplay"></span>
+          <button id="changeNameButton" onclick="showChangeNameForm()">
+            更改名字
+          </button>
+        </div>
+      </div>
+      <div id="scoreBoard"></div>
+      <div id="playerCount"></div>
     </div>
 
     <div id="changeNameForm" style="display: none">

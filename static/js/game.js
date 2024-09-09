@@ -157,12 +157,13 @@ function drawTank(x, y, angle, color, alive, name) {
   gameArea.appendChild(tankGroup);
 }
 
+// 修改 drawBullet 函数
 function drawBullet(x, y) {
   const bullet = createSVGElement("circle", {
     cx: x - maze_info.offset_x,
     cy: y - maze_info.offset_y,
-    r: 3,
-    fill: "black",
+    r: 3, // 恢复原来的大小
+    fill: "black", // 改回黑色
   });
   gameArea.appendChild(bullet);
 }
@@ -179,8 +180,10 @@ function drawExplosion(x, y, frame) {
   gameArea.appendChild(explosion);
 }
 
+// 修改 drawPlayers 函数
 function drawPlayers() {
   console.log("Drawing players", players);
+  console.log("Drawing bullets", bullets);
   if (!gameArea) {
     console.error("gameArea is not initialized");
     return;
@@ -208,6 +211,7 @@ function drawPlayers() {
   // 绘制子弹
   for (let bullet of bullets) {
     drawBullet(bullet.x, bullet.y);
+    console.log(`Drawing bullet at (${bullet.x}, ${bullet.y})`);
   }
 
   // 绘制爆炸效果
@@ -242,7 +246,7 @@ function joinGame() {
   }
 }
 
-// 添加 resizeCanvas 函数
+// 添加 resizeCanvas 数
 function resizeCanvas() {
   if (maze_info && maze_info.width && maze_info.height) {
     const scale = Math.min(
@@ -271,7 +275,7 @@ window.onload = function () {
     showJoinForm();
   }
 
-  // 将事件监听器添加到 document 而不是 gameArea
+  // 事件监听器添加到 document 而不是 gameArea
   document.addEventListener("mousemove", handleMouseMove);
   document.addEventListener("mousedown", handleMouseDown);
   document.addEventListener("mouseup", handleMouseUp);
@@ -303,6 +307,18 @@ window.onload = function () {
   logElementState("joinForm");
   logElementState("playerName");
   logElementState("joinButton");
+
+  // 添加更改名字相关的事件监听器
+  document
+    .getElementById("changeNameButton")
+    .addEventListener("click", showChangeNameForm);
+  document
+    .getElementById("newPlayerName")
+    .addEventListener("keypress", function (event) {
+      if (event.key === "Enter") {
+        submitNewName();
+      }
+    });
 
   console.log("Window onload complete");
 };
@@ -345,7 +361,7 @@ socket.on("rejoin_game", () => {
   }
 });
 
-// 确字体加载完成后再开始游戏
+// 确认字体加载完成后再开始游戏
 document.fonts.load('12px "GNU Unifont"').then(() => {
   if (localStorage.getItem("playerName") && gameArea) {
     isGameRunning = true;
@@ -420,13 +436,13 @@ socket.on("game_over", (data) => {
   isGameRunning = false;
 });
 
-// 添加 showPlayerInfo 函数
+// 添加 showPlayerInfo 数
 function showPlayerInfo(name) {
-  const playerInfo = document.getElementById("playerInfo");
-  if (playerInfo) {
-    playerInfo.innerHTML = `玩家名: <span id="playerNameDisplay">${name}</span>`;
+  const playerNameDisplay = document.getElementById("playerNameDisplay");
+  if (playerNameDisplay) {
+    playerNameDisplay.textContent = name;
   } else {
-    console.error("Player info element not found");
+    console.error("Player name display element not found");
   }
 }
 
@@ -471,7 +487,7 @@ function startGame() {
   requestAnimationFrame(gameLoop);
 }
 
-// 添加 showWaitingScreen 函数
+// 添加 showWaitingScreen 函
 function showWaitingScreen() {
   document.getElementById("joinForm").style.display = "none";
   document.getElementById("gameInfo").style.display = "flex";
@@ -497,6 +513,9 @@ function gameLoop(currentTime) {
       const dy = mouseY - player.y;
       const angle = Math.atan2(dy, dx);
 
+      // 立即更新本地玩家的角度
+      player.angle = angle;
+
       console.log("My ID:", myId);
       console.log("Player position:", player.x, player.y);
       console.log("Mouse position:", mouseX, mouseY);
@@ -515,6 +534,8 @@ function gameLoop(currentTime) {
         players
       );
     }
+
+    // 每帧都重新绘制所有游戏元素
     drawPlayers();
   }
   requestAnimationFrame(gameLoop);
@@ -535,7 +556,7 @@ function handleMouseMove(event) {
   const gameMouseX = (event.clientX - rect.left) * scaleX;
   const gameMouseY = (event.clientY - rect.top) * scaleY;
 
-  // 限制鼠标位置在游戏区域内
+  // 限制鼠标置在游戏区域内
   mouseX = Math.max(
     maze_info.offset_x,
     Math.min(
@@ -567,6 +588,10 @@ function handleMouseDown(event) {
   }
 }
 
+// 确保这个事件监听器被正确添加
+document.addEventListener("mousedown", handleMouseDown);
+document.addEventListener("contextmenu", (e) => e.preventDefault());
+
 // 修改 handleMouseUp 函数
 function handleMouseUp(event) {
   event.preventDefault();
@@ -574,6 +599,28 @@ function handleMouseUp(event) {
     // 左键
     isMoving = false;
   }
+}
+
+// 修改 socket.on("update_bullets") 事件处理器
+socket.on("update_bullets", (updatedBullets) => {
+  console.log("Received updated bullets:", updatedBullets);
+  bullets = updatedBullets;
+  drawPlayers(); // 立即重新绘制
+});
+
+// 修改 socket.on("player_killed") 事件处理器
+socket.on("player_killed", (data) => {
+  console.log("Player killed:", data);
+  addExplosion(data.x, data.y);
+  if (data.id === myId) {
+    console.log("You were killed!");
+  }
+  drawPlayers(); // 重新绘制以更新玩家状态
+});
+
+// 修改 addExplosion 函数
+function addExplosion(x, y) {
+  explosions.push({ x: x, y: y, frame: 0 });
 }
 
 socket.on("player_updated", (data) => {
@@ -590,37 +637,6 @@ socket.on("player_updated", (data) => {
   }
 });
 
-socket.on("update_bullets", (updatedBullets) => {
-  console.log("Received updated bullets:", updatedBullets);
-  bullets = updatedBullets;
-});
-
-// 修改 addExplosion 函数
-function addExplosion(x, y, callback) {
-  explosions.push({ x: x, y: y, frame: 0 });
-  let explosionInterval = setInterval(() => {
-    drawPlayers(); // 重新绘制所有内容，包括爆炸效果
-    if (explosions[explosions.length - 1].frame >= 30) {
-      clearInterval(explosionInterval);
-      explosions.pop();
-      if (callback) callback();
-    }
-  }, 1000 / 60); // 60 FPS
-}
-
-socket.on("player_killed", (data) => {
-  console.log("Player killed:", data);
-  addExplosion(data.x, data.y, () => {
-    if (data.gameOver) {
-      showGameOver(data.winner);
-    }
-  });
-  if (data.id === myId) {
-    console.log("You were killed!");
-    // 可以在这里添加玩家被击杀的其他逻辑
-  }
-});
-
 // 修改 showGameOver 函数
 function showGameOver(winner) {
   document.getElementById("winnerName").textContent = winner;
@@ -633,4 +649,46 @@ socket.on("game_over", (data) => {
   wins = data.wins;
   updateScoreBoard();
   // 游戏结束的提示将在爆炸特效结束后由 player_killed 事件处理
+});
+
+// 添加这个函数
+function showChangeNameForm() {
+  console.log("Showing change name form");
+  document.getElementById("gameInfo").style.display = "none";
+  document.getElementById("changeNameForm").style.display = "block";
+  document.getElementById("newPlayerName").value = "";
+  document.getElementById("newPlayerName").focus();
+}
+
+// 添加这个函数
+function submitNewName() {
+  const newName = document.getElementById("newPlayerName").value.trim();
+  if (newName) {
+    console.log("Submitting new name:", newName);
+    localStorage.setItem("playerName", newName);
+    socket.emit("change_name", { name: newName });
+    showPlayerInfo(newName);
+    document.getElementById("changeNameForm").style.display = "none";
+    document.getElementById("gameInfo").style.display = "flex";
+  } else {
+    alert("请输入有效的名字");
+  }
+}
+
+// 添加这个函数
+function cancelChangeName() {
+  console.log("Cancelling name change");
+  document.getElementById("changeNameForm").style.display = "none";
+  document.getElementById("gameInfo").style.display = "flex";
+}
+
+// 添加这个事件监听器
+socket.on("name_changed", (data) => {
+  console.log("Name changed:", data);
+  if (data.id === myId) {
+    showPlayerInfo(data.new_name);
+  }
+  players[data.id].name = data.new_name;
+  players[data.id].color = data.new_color;
+  updateScoreBoard();
 });
