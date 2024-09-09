@@ -1,4 +1,15 @@
-const socket = io();
+const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
+const host = window.location.hostname;
+const port = window.location.port || (protocol === "wss:" ? "443" : "80");
+
+const socket = io(`${protocol}//${host}:${port}`, {
+  transports: ["websocket", "polling"],
+  reconnectionAttempts: 5,
+});
+
+socket.on("connect_error", (error) => {
+  console.error("连接错误:", error);
+});
 const svgNS = "http://www.w3.org/2000/svg";
 
 // 全局变量
