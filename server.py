@@ -5,7 +5,7 @@ import math
 from threading import Thread
 
 app = Flask(__name__, static_folder='static')
-socketio = SocketIO(app, async_mode='threading')
+socketio = SocketIO(app, async_mode='eventlet', websocket=True)
 
 @app.route('/')
 def index():
