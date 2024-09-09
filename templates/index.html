@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html lang="zh">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>坦克大战</title>
+    <link rel="stylesheet" href="/static/css/style.css" />
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.0.1/socket.io.js"></script>
+  </head>
+  <body>
+    <div id="gameContainer">
+      <!-- SVG 将在 JavaScript 中动态创建 -->
+    </div>
+
+    <div id="gameInfo" style="display: none">
+      <div id="playerInfoContainer">
+        <div id="playerInfo"></div>
+        <button id="changeNameButton" onclick="showChangeNameForm()">
+          更改名字
+        </button>
+      </div>
+      <div id="scoreBoard"></div>
+      <div id="playerCount"></div>
+    </div>
+
+    <div id="joinForm" style="display: none">
+      <input type="text" id="playerName" placeholder="输入你的名字" />
+      <button onclick="joinGame()">加入游戏</button>
+    </div>
+
+    <div id="changeNameForm" style="display: none">
+      <input type="text" id="newPlayerName" placeholder="输入新的名字" />
+      <button onclick="submitNewName()">确认</button>
+      <button onclick="cancelChangeName()">取消</button>
+    </div>
+
+    <div id="waitingModal" style="display: none">
+      等待其他玩家加入...<br />
+      当前玩家数: <span id="currentPlayerCount"></span>
+    </div>
+
+    <div id="gameOverModal" style="display: none">
+      游戏结束！<br />
+      获胜者: <span id="winnerName"></span><br />
+      <button id="restartButton">重新开始</button>
+    </div>
+
+    <div id="notification" style="display: none"></div>
+
+    <script src="/static/js/game.js"></script>
+  </body>
+</html>
