@@ -240,7 +240,7 @@ def handle_player_move(data):
     if not player['alive']:
         return
 
-    speed = 2
+    speed = 1.5
     player['angle'] = data['angle']
     player['moving'] = data['moving']
 
@@ -260,21 +260,21 @@ def handle_player_move(data):
         else:
             print(f"Player {player_id} collision detected")
 
-    # 使用 packb 将数据转换为二进制格式
-    binary_data = packb({
-        'id': player_id,
-        'data': {
-            'x': player['x'],
-            'y': player['y'],
-            'angle': player['angle'],
-            'moving': player['moving'],
-            'alive': player['alive'],
-            'color': player['color'],
-            'name': player['name']
-        }
-    }, use_bin_type=True)
+    # # 使用 packb 将数据转换为二进制格式
+    # binary_data = packb({
+    #     'id': player_id,
+    #     'data': {
+    #         'x': player['x'],
+    #         'y': player['y'],
+    #         'angle': player['angle'],
+    #         'moving': player['moving'],
+    #         'alive': player['alive'],
+    #         'color': player['color'],
+    #         'name': player['name']
+    #     }
+    # }, use_bin_type=True)
 
-    emit('player_updated', binary_data, broadcast=True, binary=True)
+    # emit('player_updated', binary_data, broadcast=True, binary=True)
 
 @socketio.on('fire')
 def handle_fire():
@@ -301,7 +301,7 @@ def handle_fire():
     }
     bullets.append(bullet)
     print(f"Bullet created: {bullet}")
-    socketio.emit('update_bullets', bullets, namespace='/')
+    # socketio.emit('update_bullets', bullets, namespace='/')
 
 def reflect_bullet(bullet, wall):
     # 计算墙壁的法线向量
@@ -379,7 +379,7 @@ def update_game():
         if bullet in bullets:
             bullets.remove(bullet)
     
-    socketio.emit('update_bullets', bullets, namespace='/')
+    # socketio.emit('update_bullets', bullets, namespace='/')
 
 def point_in_rectangle(px, py, rx, ry, rw, rh):
     return rx <= px <= rx + rw and ry <= py <= ry + rh
@@ -397,9 +397,20 @@ def check_winner():
     return False, None
 
 def start_game_loop():
+    update_counter = 0
     while True:
-        socketio.sleep(1/30)  # 30 FPS
+        socketio.sleep(1/60)  # 60 FPS 的游戏逻辑
         update_game()
+        update_counter += 1
+        if update_counter >= 3:  # 每3帧发送一次更新，相当于20 FPS
+            update_counter = 0
+            send_game_state()
+
+def send_game_state():
+    game_state = {
+        'players': {id: {'x': p['x'], 'y': p['y'], 'angle': p['angle'], 'alive': p['alive']} for id, p in players.items()},
+        'bullets': [{'x': b['x'], 'y': b['y'], 'angle': b['angle'], 'speed': 5, 'id': id(b)} for b in bullets]    }
+    socketio.emit('game_state', packb(game_state), namespace='/')
 
 def run_game_loop():
     Thread(target=start_game_loop).start()

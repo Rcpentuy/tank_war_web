@@ -38,6 +38,12 @@ let mouseY = 0;
 let isMoving = false;
 let gameOverTimeout = null;
 
+let lastGameState = null;
+let currentGameState = null;
+let interpolationFactor = 0;
+const INTERPOLATION_DURATION = 50; // 插值持续时间（毫秒）
+let lastUpdateTime = 0;
+
 function measureLatency() {
   const start = performance.now();
   socket.emit("ping", { clientTime: start }, (serverResponse) => {
@@ -195,8 +201,8 @@ function drawBullet(x, y) {
   const bullet = createSVGElement("circle", {
     cx: x - maze_info.offset_x,
     cy: y - maze_info.offset_y,
-    r: 3, // 恢复原来的大小
-    fill: "black", // 改回黑色
+    r: 3,
+    fill: "black", // 黑色
   });
   gameArea.appendChild(bullet);
 }
@@ -622,34 +628,80 @@ function gameLoop(currentTime) {
     return;
   }
 
-  const deltaTime = currentTime - lastTime;
-  if (deltaTime >= 1000 / FPS) {
-    lastTime = currentTime;
-
-    if (myId && players[myId] && players[myId].alive) {
-      const player = players[myId];
-      const dx = mouseX - player.x;
-      const dy = mouseY - player.y;
-      const angle = Math.atan2(dy, dx);
-
-      socket.emit("player_move", {
-        angle: angle,
-        moving: isMoving,
-      });
-    } else if (myId && players[myId] && !players[myId].alive) {
-      isMoving = false;
-    } else {
-      console.log(
-        "Player not found or myId not set. myId:",
-        myId,
-        "players:",
-        players
-      );
-    }
-
-    drawPlayers();
-  }
   requestAnimationFrame(gameLoop);
+
+  if (lastGameState && currentGameState) {
+    interpolationFactor = Math.min(
+      1,
+      (currentTime - lastUpdateTime) / INTERPOLATION_DURATION
+    );
+    updateGameState();
+  }
+
+  if (isMoving && players[myId]) {
+    const player = players[myId];
+    const dx = mouseX - player.x;
+    const dy = mouseY - player.y;
+    const angle = Math.atan2(dy, dx);
+    socket.emit("player_move", { angle: angle, moving: true });
+  }
+
+  //   // 更新子弹位置
+  //   bullets.forEach((bullet) => {
+  //     bullet.x += Math.cos(bullet.angle) * bullet.speed * (1 / 60); // 假设 60 FPS
+  //     bullet.y += Math.sin(bullet.angle) * bullet.speed * (1 / 60);
+  //   });
+  drawPlayers();
+}
+
+function updateGameState() {
+  if (!lastGameState) {
+    lastGameState = currentGameState;
+  }
+  for (let id in currentGameState.players) {
+    if (!players[id]) {
+      players[id] = currentGameState.players[id];
+    } else {
+      const lastPlayer =
+        lastGameState.players[id] || currentGameState.players[id];
+      const currentPlayer = currentGameState.players[id];
+      players[id].x = lerp(lastPlayer.x, currentPlayer.x, interpolationFactor);
+      players[id].y = lerp(lastPlayer.y, currentPlayer.y, interpolationFactor);
+      players[id].angle = lerpAngle(
+        lastPlayer.angle,
+        currentPlayer.angle,
+        interpolationFactor
+      );
+      players[id].alive = currentPlayer.alive;
+    }
+  }
+
+  bullets = currentGameState.bullets.map((currentBullet) => {
+    const lastBullet = lastGameState.bullets.find(
+      (b) => b.id === currentBullet.id
+    );
+    if (lastBullet) {
+      return {
+        x: lerp(lastBullet.x, currentBullet.x, interpolationFactor),
+        y: lerp(lastBullet.y, currentBullet.y, interpolationFactor),
+        angle: currentBullet.angle,
+        speed: currentBullet.speed,
+        id: currentBullet.id,
+      };
+    } else {
+      return currentBullet;
+    }
+  });
+}
+
+function lerp(start, end, factor) {
+  return start + (end - start) * factor;
+}
+
+function lerpAngle(start, end, factor) {
+  const diff = end - start;
+  const shortestAngle = ((diff + Math.PI) % (Math.PI * 2)) - Math.PI;
+  return start + shortestAngle * factor;
 }
 
 // 修改 handleMouseMove 函数
@@ -710,11 +762,17 @@ function handleMouseUp(event) {
   }
 }
 
-// 修改 socket.on("update_bullets") 事件处理器
-socket.on("update_bullets", (updatedBullets) => {
-  bullets = updatedBullets;
-  drawPlayers(); // 立即重新绘制
+socket.on("game_state", (binaryData) => {
+  lastGameState = currentGameState;
+  currentGameState = msgpack.decode(new Uint8Array(binaryData));
+  lastUpdateTime = performance.now();
+  interpolationFactor = 0;
 });
+
+// socket.on("update_bullets", (updatedBullets) => {
+//   bullets = updatedBullets;
+//   drawPlayers(); // 立即重新绘制
+// });
 
 socket.on("player_killed", (data) => {
   console.log("Player killed:", data);
