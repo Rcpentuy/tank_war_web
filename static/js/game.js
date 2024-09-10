@@ -2,6 +2,8 @@ const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
 const host = window.location.hostname;
 const port = window.location.port || (protocol === "wss:" ? "443" : "80");
 
+const msgpack = MessagePack;
+
 const socket = io(`${protocol}//${host}:${port}`, {
   transports: ["websocket", "polling"],
   reconnectionAttempts: 5,
@@ -25,7 +27,7 @@ let isPlayerListVisible = false;
 let isGameRunning = false;
 const FPS = 60;
 let explosions = [];
-let lastTime = 0;
+let lastTime = performance.now();
 const explosionDuration = 500; // 爆炸动画持续时间（毫秒）
 let waitingInterval;
 let gameState = "not_joined"; // 可能的状态: 'not_joined', 'waiting', 'playing'
@@ -37,10 +39,10 @@ let isMoving = false;
 let gameOverTimeout = null;
 
 function measureLatency() {
-  const start = Date.now();
+  const start = performance.now();
   socket.emit("ping", { clientTime: start }, (serverResponse) => {
-    const end = Date.now();
-    const latency = end - serverResponse.serverTime;
+    const end = performance.now();
+    const latency = Math.round(end - serverResponse.serverTime);
     socket.emit("latency", { latency: latency });
   });
 }
@@ -733,11 +735,18 @@ function addExplosion(x, y) {
   explosions.push({ x: x, y: y, frame: 0 });
 }
 
-socket.on("player_updated", (data) => {
-  if (data.id in players) {
-    players[data.id] = data.data;
-  } else {
-    console.log(`Received update for unknown player ${data.id}`);
+socket.on("player_updated", (binaryData) => {
+  try {
+    // 解码二进制数据
+    const data = msgpack.decode(new Uint8Array(binaryData));
+
+    if (data.id in players) {
+      players[data.id] = data.data;
+    } else {
+      console.log(`Received update for unknown player ${data.id}`);
+    }
+  } catch (error) {
+    console.error("Error decoding player update data:", error);
   }
 });
 

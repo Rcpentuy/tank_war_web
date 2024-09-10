@@ -4,3 +4,4 @@ gunicorn
 eventlet
 python-socketio
 python-engineio
+msgpack

@@ -1,5 +1,6 @@
 from flask import Flask, render_template, request, jsonify, send_from_directory
 from flask_socketio import SocketIO, emit
+from msgpack import packb, unpackb
 import random
 import math
 from threading import Thread
@@ -259,8 +260,21 @@ def handle_player_move(data):
         else:
             print(f"Player {player_id} collision detected")
 
-    emit('player_updated', {'id': player_id, 'data': player}, broadcast=True)
-    # print(f"Emitted player_updated for {player_id}: {player}")
+    # 使用 packb 将数据转换为二进制格式
+    binary_data = packb({
+        'id': player_id,
+        'data': {
+            'x': player['x'],
+            'y': player['y'],
+            'angle': player['angle'],
+            'moving': player['moving'],
+            'alive': player['alive'],
+            'color': player['color'],
+            'name': player['name']
+        }
+    }, use_bin_type=True)
+
+    emit('player_updated', binary_data, broadcast=True, binary=True)
 
 @socketio.on('fire')
 def handle_fire():
