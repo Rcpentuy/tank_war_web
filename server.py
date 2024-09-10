@@ -3,6 +3,7 @@ from flask_socketio import SocketIO, emit
 import random
 import math
 from threading import Thread
+import time
 
 app = Flask(__name__, static_folder='static')
 socketio = SocketIO(app, async_mode='eventlet', websocket=True)
@@ -29,6 +30,7 @@ GAME_HEIGHT = 800  # 恢复原来的游戏高度
 maze_info = {}
 wins = {}  # 用于记录每个玩家的胜利次数
 player_colors = {}  # 用于记录每个玩家的颜色
+player_latencies = {}
 
 def generate_maze(width, height):
     maze = [[0 for _ in range(width)] for _ in range(height)]
@@ -153,6 +155,18 @@ def circle_rectangle_collision(circle_x, circle_y, circle_radius, rect):
     
     return distance_squared <= circle_radius**2
 
+@socketio.on('ping')
+def handle_ping(data):
+    client_time = data['clientTime']
+    server_time = int(time.time() * 1000)  # 转换为毫秒
+    emit('pong', {'clientTime': client_time, 'serverTime': server_time})
+
+@socketio.on('latency')
+def handle_latency(data):
+    player_id = request.sid
+    player_latencies[player_id] = data['latency']
+    emit('update_latencies', player_latencies, broadcast=True)
+
 @socketio.on('player_join')
 def handle_player_join(data):
     global maze_info
@@ -179,6 +193,7 @@ def handle_player_join(data):
         if player_id not in wins:
             wins[player_id] = 0  # 初始化玩家胜利次数
     respawn_player(player_id)
+    player_latencies[player_id] = 0  # 初始化延迟
     socketio.emit('player_joined', {'id': player_id, 'players': players, 'walls': walls, 'maze_info': maze_info, 'wins': wins}, namespace='/')
     socketio.emit('update_player_count', {'count': len(players), 'players': [p['name'] for p in players.values()]}, namespace='/')
     check_game_state()  # 检查游戏状态
@@ -194,9 +209,10 @@ def handle_disconnect():
     player_id = request.sid
     if player_id in players:
         del players[player_id]
-        del wins[player_id]  # 移除玩家的胜利记录
+        del wins[player_id]
+        del player_latencies[player_id]  # 移除玩家的延迟记录
         socketio.emit('player_left', {'id': player_id}, namespace='/')
-        socketio.emit('update_player_count', {'count': len(players), 'players': [p['name'] for p in players.values()]}, namespace='/')
+        socketio.emit('update_player_count', {'count': len(players), 'players': [p['name'] for p in players.values()], 'latencies': player_latencies}, namespace='/')
     check_game_state()
 
 @socketio.on('change_name')

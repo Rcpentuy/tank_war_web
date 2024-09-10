@@ -20,6 +20,8 @@ let bullets = [];
 let walls = [];
 let maze_info = {};
 let wins = {};
+let playerLatencies = {};
+let isPlayerListVisible = false;
 let isGameRunning = false;
 const FPS = 60;
 let explosions = [];
@@ -34,7 +36,21 @@ let mouseY = 0;
 let isMoving = false;
 let gameOverTimeout = null;
 
-// 在文件开头添加这个函数
+function measureLatency() {
+  const start = Date.now();
+  socket.emit("ping", { clientTime: start }, (serverResponse) => {
+    const end = Date.now();
+    const latency = end - serverResponse.serverTime;
+    socket.emit("latency", { latency: latency });
+  });
+}
+
+socket.on("pong", (data) => {
+  const end = Date.now();
+  const latency = end - data.clientTime;
+  socket.emit("latency", { latency: latency });
+});
+
 function logElementState(elementId) {
   const element = document.getElementById(elementId);
   if (element) {
@@ -191,7 +207,6 @@ function drawExplosion(x, y, frame) {
   gameArea.appendChild(explosion);
 }
 
-// 修改 drawPlayers 函数
 function drawPlayers() {
   console.log("Drawing players", players);
   console.log("Drawing bullets", bullets);
@@ -276,6 +291,15 @@ window.onload = function () {
   gameArea.id = "gameArea";
   document.getElementById("gameContainer").appendChild(gameArea);
 
+  document.addEventListener("keydown", function (event) {
+    if (event.key === "Tab") {
+      event.preventDefault();
+      togglePlayerList();
+    }
+  });
+
+  setInterval(measureLatency, 5000); // 每5秒测量一次延迟
+
   const savedName = localStorage.getItem("playerName");
   if (savedName) {
     console.log("Saved name found:", savedName);
@@ -354,6 +378,27 @@ window.onload = function () {
   console.log("Window onload complete");
 };
 
+// 添加新的函数来切换玩家列表的显示
+function togglePlayerList() {
+  isPlayerListVisible = !isPlayerListVisible;
+  const playerList = document.getElementById("playerList");
+  playerList.style.display = isPlayerListVisible ? "block" : "none";
+  if (isPlayerListVisible) {
+    updatePlayerList();
+  }
+}
+
+function updatePlayerList() {
+  const playerList = document.getElementById("playerList");
+  let listHtml = "<h3>在线玩家</h3>";
+  for (let id in players) {
+    const latency =
+      playerLatencies[id] !== undefined ? playerLatencies[id] : "未知";
+    listHtml += `<p>${players[id].name}: ${latency}ms</p>`;
+  }
+  playerList.innerHTML = listHtml;
+}
+
 // 确保 handleEnterKey 函数被定义
 function handleEnterKey(event) {
   if (event.key === "Enter") {
@@ -381,6 +426,13 @@ function showJoinForm() {
   logElementState("playerName");
   logElementState("joinButton");
 }
+
+socket.on("game_start", () => {
+  console.log("Game started");
+  document.getElementById("waitingModal").style.display = "none";
+  document.getElementById("gameInfo").style.display = "block";
+  updatePlayerList(); // 添加这行
+});
 
 // 添加这个事件监听器
 socket.on("rejoin_game", () => {
@@ -451,12 +503,37 @@ socket.on("player_joined", (data) => {
     document.getElementById("currentPlayerCount").textContent =
       Object.keys(players).length;
   }
+  playerLatencies = data.latencies || {};
+  updatePlayerList();
+});
+
+socket.on("update_latencies", (latencies) => {
+  playerLatencies = latencies;
+  if (isPlayerListVisible) {
+    updatePlayerList();
+  }
+});
+
+socket.on("player_left", (data) => {
+  console.log("Player left:", data.id);
+  if (players[data.id]) {
+    delete players[data.id];
+  }
+  if (playerLatencies[data.id]) {
+    delete playerLatencies[data.id];
+  }
+  updatePlayerList();
+  drawPlayers(); // 重新绘制游戏画面
 });
 
 socket.on("update_player_count", (data) => {
   const playerCount = document.getElementById("playerCount");
   playerCount.textContent = `在线玩家: ${data.count}`;
   playerCount.title = `在线玩家:\n${data.players.join("\n")}`;
+  playerLatencies = data.latencies || {}; // 更新延迟信息
+  if (isPlayerListVisible) {
+    updatePlayerList();
+  }
 });
 
 socket.on("game_over", (data) => {
