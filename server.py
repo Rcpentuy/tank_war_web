@@ -398,7 +398,7 @@ def check_winner():
 
 def start_game_loop():
     while True:
-        socketio.sleep(1/60)  # 60 FPS
+        socketio.sleep(1/30)  # 30 FPS
         update_game()
 
 def run_game_loop():
