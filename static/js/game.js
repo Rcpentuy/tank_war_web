@@ -14,7 +14,7 @@ const svgNS = "http://www.w3.org/2000/svg";
 
 // 全局变量
 let gameArea;
-let myId;
+let myId = null;
 let players = {};
 let bullets = [];
 let walls = [];
@@ -85,6 +85,10 @@ function drawWall(wall) {
 }
 
 function drawTank(x, y, angle, color, alive, name) {
+  const nameBackgroundColor = alive
+    ? "rgba(0, 0, 0, 0.5)"
+    : "rgba(128, 128, 128, 0.5)";
+  const nameTextColor = alive ? "white" : "darkgray";
   const tankSize = 20; // 坦克尺寸
   const tankGroup = createSVGElement("g", {
     transform: `translate(${x - maze_info.offset_x} ${y - maze_info.offset_y})`,
@@ -155,7 +159,7 @@ function drawTank(x, y, angle, color, alive, name) {
     x: 0,
     y: -tankSize - 5,
     "text-anchor": "middle",
-    fill: "white",
+    fill: nameTextColor,
     "font-size": fontSize,
     "font-family": "GNU Unifont, sans-serif",
   });
@@ -173,7 +177,7 @@ function drawTank(x, y, angle, color, alive, name) {
     y: -tankSize - fontSize - padding - 5,
     width: textWidth + padding * 2,
     height: fontSize + padding * 2,
-    fill: "rgba(0, 0, 0, 0.5)",
+    fill: nameBackgroundColor,
     rx: 2,
     ry: 2,
   });
@@ -484,14 +488,20 @@ socket.on("game_reset", (data) => {
   }
 });
 
-// 添加这些事件监听器
+// 修改 "player_joined" 事件处理函数
 socket.on("player_joined", (data) => {
   console.log("Player joined event received", data);
   players = data.players;
   walls = data.walls;
   maze_info = data.maze_info;
   wins = data.wins;
-  myId = data.id;
+
+  // 只在 myId 为 null 时设置它
+  if (myId === null) {
+    myId = data.id;
+    console.log("myId set to:", myId);
+  }
+
   adjustCanvasSize();
   updateScoreBoard();
   if (Object.keys(players).length > 1) {
@@ -619,16 +629,12 @@ function gameLoop(currentTime) {
       const dy = mouseY - player.y;
       const angle = Math.atan2(dy, dx);
 
-      //   console.log("My ID:", myId);
-      //   console.log("Player position:", player.x, player.y);
-      //   console.log("Mouse position:", mouseX, mouseY);
-      //   console.log("Calculated angle:", angle);
-      //   console.log("Is moving:", isMoving);
-
       socket.emit("player_move", {
         angle: angle,
         moving: isMoving,
       });
+    } else if (myId && players[myId] && !players[myId].alive) {
+      isMoving = false;
     } else {
       console.log(
         "Player not found or myId not set. myId:",
@@ -638,7 +644,6 @@ function gameLoop(currentTime) {
       );
     }
 
-    // 每帧都重新绘制所有游戏元素
     drawPlayers();
   }
   requestAnimationFrame(gameLoop);
@@ -716,6 +721,8 @@ socket.on("player_killed", (data) => {
   addExplosion(data.x, data.y);
   if (data.id === myId) {
     console.log("You were killed!");
+    isMoving = false;
+    socket.emit("player_move", { angle: 0, moving: false });
   }
   drawPlayers(); // 重新绘制以更新玩家状态
 });
@@ -726,14 +733,8 @@ function addExplosion(x, y) {
 }
 
 socket.on("player_updated", (data) => {
-  //   console.log("Player updated received:", data);
   if (data.id in players) {
     players[data.id] = data.data;
-    // console.log(
-    //   `Updated player ${data.id} position:`,
-    //   players[data.id].x,
-    //   players[data.id].y
-    // );
   } else {
     console.log(`Received update for unknown player ${data.id}`);
   }

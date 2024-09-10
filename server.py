@@ -194,8 +194,14 @@ def handle_player_join(data):
             wins[player_id] = 0  # 初始化玩家胜利次数
     respawn_player(player_id)
     player_latencies[player_id] = 0  # 初始化延迟
-    socketio.emit('player_joined', {'id': player_id, 'players': players, 'walls': walls, 'maze_info': maze_info, 'wins': wins}, namespace='/')
-    socketio.emit('update_player_count', {'count': len(players), 'players': [p['name'] for p in players.values()]}, namespace='/')
+    
+    # 向新加入的玩家发送他们自己的 ID
+    emit('player_joined', {'id': player_id, 'players': players, 'walls': walls, 'maze_info': maze_info, 'wins': wins})
+    
+    # 向其他玩家广播新玩家加入的消息，但不包括 ID
+    emit('player_joined', {'players': players, 'walls': walls, 'maze_info': maze_info, 'wins': wins}, broadcast=True, include_self=False)
+    
+    emit('update_player_count', {'count': len(players), 'players': [p['name'] for p in players.values()]}, broadcast=True)
     check_game_state()  # 检查游戏状态
 
 def check_game_state():
@@ -229,6 +235,7 @@ def handle_change_name(data):
 @socketio.on('player_move')
 def handle_player_move(data):
     player_id = request.sid
+    print(f"Received move from player {player_id}")
     player = players[player_id]
     if not player['alive']:
         return
