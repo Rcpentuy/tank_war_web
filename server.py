@@ -323,10 +323,6 @@ def reflect_bullet(bullet, wall):
     # 更新子弹角度
     bullet['angle'] = math.atan2(reflected[1], reflected[0])
     
-    # 将子弹稍微移出墙壁
-    offset = 1  # 1像素的偏移
-    bullet['x'] += normal[0] * offset
-    bullet['y'] += normal[1] * offset
 
 def update_game():
     global bullets
