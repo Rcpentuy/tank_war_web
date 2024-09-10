@@ -46,8 +46,8 @@ function measureLatency() {
 }
 
 socket.on("pong", (data) => {
-  const end = Date.now();
-  const latency = end - data.clientTime;
+  const end = performance.now();
+  const latency = Math.round(end - data.clientTime);
   socket.emit("latency", { latency: latency });
 });
 
@@ -600,6 +600,7 @@ function startGame() {
   document.getElementById("waitingModal").style.display = "none";
   gameState = "playing";
   isGameRunning = true;
+  lastTime = performance.now(); // 重置 lastTime
   requestAnimationFrame(gameLoop);
 }
 

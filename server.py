@@ -235,7 +235,6 @@ def handle_change_name(data):
 @socketio.on('player_move')
 def handle_player_move(data):
     player_id = request.sid
-    print(f"Received move from player {player_id}")
     player = players[player_id]
     if not player['alive']:
         return
@@ -243,8 +242,6 @@ def handle_player_move(data):
     speed = 2
     player['angle'] = data['angle']
     player['moving'] = data['moving']
-
-    # print(f"Player {player_id} move: angle={data['angle']}, moving={data['moving']}")
 
     if player['moving']:
         dx = math.cos(player['angle']) * speed
