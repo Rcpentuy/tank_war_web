@@ -101,7 +101,7 @@ function drawTank(x, y, angle, color, alive, name) {
     y: -tankSize / 2,
     width: tankSize,
     height: tankSize,
-    fill: alive ? color : "gray",
+    fill: alive ? color : "gray", // 如果玩家死亡，使用灰色
   });
   tankBody.appendChild(body);
 
@@ -208,8 +208,6 @@ function drawExplosion(x, y, frame) {
 }
 
 function drawPlayers() {
-  console.log("Drawing players", players);
-  console.log("Drawing bullets", bullets);
   if (!gameArea) {
     console.error("gameArea is not initialized");
     return;
@@ -229,7 +227,7 @@ function drawPlayers() {
       player.y,
       player.angle,
       player.color,
-      player.alive,
+      player.alive, // 确保这里传递了 alive 状态
       player.name
     );
   }
@@ -237,7 +235,7 @@ function drawPlayers() {
   // 绘制子弹
   for (let bullet of bullets) {
     drawBullet(bullet.x, bullet.y);
-    console.log(`Drawing bullet at (${bullet.x}, ${bullet.y})`);
+    // console.log(`Drawing bullet at (${bullet.x}, ${bullet.y})`);
   }
 
   // 绘制爆炸效果
@@ -615,20 +613,17 @@ function gameLoop(currentTime) {
   if (deltaTime >= 1000 / FPS) {
     lastTime = currentTime;
 
-    if (myId && players[myId]) {
+    if (myId && players[myId] && players[myId].alive) {
       const player = players[myId];
       const dx = mouseX - player.x;
       const dy = mouseY - player.y;
       const angle = Math.atan2(dy, dx);
 
-      // 立即更新本地玩家的角度
-      player.angle = angle;
-
-      console.log("My ID:", myId);
-      console.log("Player position:", player.x, player.y);
-      console.log("Mouse position:", mouseX, mouseY);
-      console.log("Calculated angle:", angle);
-      console.log("Is moving:", isMoving);
+      //   console.log("My ID:", myId);
+      //   console.log("Player position:", player.x, player.y);
+      //   console.log("Mouse position:", mouseX, mouseY);
+      //   console.log("Calculated angle:", angle);
+      //   console.log("Is moving:", isMoving);
 
       socket.emit("player_move", {
         angle: angle,
@@ -679,8 +674,6 @@ function handleMouseMove(event) {
       maze_info.offset_y + maze_info.height
     )
   );
-
-  console.log("Mouse moved:", mouseX, mouseY);
 }
 
 // 修改 handleMouseDown 函数
@@ -711,14 +704,15 @@ function handleMouseUp(event) {
 
 // 修改 socket.on("update_bullets") 事件处理器
 socket.on("update_bullets", (updatedBullets) => {
-  console.log("Received updated bullets:", updatedBullets);
   bullets = updatedBullets;
   drawPlayers(); // 立即重新绘制
 });
 
-// 修改 socket.on("player_killed") 事件处理器
 socket.on("player_killed", (data) => {
   console.log("Player killed:", data);
+  if (players[data.id]) {
+    players[data.id].alive = false; // 更新玩家状态！！！
+  }
   addExplosion(data.x, data.y);
   if (data.id === myId) {
     console.log("You were killed!");
@@ -732,31 +726,39 @@ function addExplosion(x, y) {
 }
 
 socket.on("player_updated", (data) => {
-  console.log("Player updated received:", data);
+  //   console.log("Player updated received:", data);
   if (data.id in players) {
     players[data.id] = data.data;
-    console.log(
-      `Updated player ${data.id} position:`,
-      players[data.id].x,
-      players[data.id].y
-    );
+    // console.log(
+    //   `Updated player ${data.id} position:`,
+    //   players[data.id].x,
+    //   players[data.id].y
+    // );
   } else {
     console.log(`Received update for unknown player ${data.id}`);
   }
 });
 
-// 修改 showGameOver 函数
 function showGameOver(winner) {
-  document.getElementById("winnerName").textContent = winner;
-  document.getElementById("gameOverModal").style.display = "block";
+  const gameOverModal = document.getElementById("gameOverModal");
+  const winnerNameElement = document.getElementById("winnerName");
+
+  if (winnerNameElement) {
+    winnerNameElement.textContent = winner;
+  }
+
+  if (gameOverModal) {
+    gameOverModal.style.display = "block";
+  }
+
   isGameRunning = false;
 }
 
-// 修改 socket.on("game_over") 事件处理器
 socket.on("game_over", (data) => {
+  console.log("游戏结束:", data);
   wins = data.wins;
   updateScoreBoard();
-  // 游戏结束的提示将在爆炸特效结束后由 player_killed 事件处理
+  showGameOver(data.winner);
 });
 
 // 添加这个函数

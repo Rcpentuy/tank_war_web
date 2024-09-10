@@ -6,7 +6,7 @@ from threading import Thread
 import time
 
 app = Flask(__name__, static_folder='static')
-socketio = SocketIO(app, async_mode='eventlet', websocket=True)
+socketio = SocketIO(app, async_mode='eventlet', websocket=True, ping_timeout=10, ping_interval=5, compression=True)
 
 @app.route('/')
 def index():
