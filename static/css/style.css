@@ -13,6 +13,18 @@ body {
   font-family: Arial, sans-serif;
 }
 
+.modal {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  z-index: 1000;
+  background-color: white;
+  padding: 20px;
+  border-radius: 5px;
+  box-shadow: 0 0 10px rgba(0, 0, 0, 0.3);
+}
+
 #gameCanvas {
   border: 1px solid #000;
 }
@@ -75,6 +87,7 @@ canvas {
   background: white;
   padding: 20px;
   border-radius: 10px;
+  z-index: 1004;
 }
 input,
 button {
@@ -141,7 +154,7 @@ button {
   border-radius: 15px;
   text-align: center;
   font-family: "GNU Unifont", sans-serif;
-  z-index: 1000;
+  z-index: 1003;
   box-shadow: 0 0 20px rgba(0, 0, 0, 0.2);
 }
 #gameOverModal h2 {
@@ -180,6 +193,7 @@ button {
   border-radius: 10px;
   text-align: center;
   font-family: "GNU Unifont", sans-serif;
+  z-index: 1002;
 }
 #notification {
   position: fixed;

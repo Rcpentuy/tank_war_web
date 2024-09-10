@@ -20,11 +20,16 @@
         top: 50%;
         left: 50%;
         transform: translate(-50%, -50%);
-        z-index: 1000;
+        z-index: 9999;
       "
     >
-      <input type="text" id="playerName" placeholder="输入你的名字" />
-      <button id="joinButton">加入游戏</button>
+      <input
+        type="text"
+        id="playerName"
+        placeholder="输入你的名字"
+        style="z-index: 10000"
+      />
+      <button id="joinButton" style="z-index: 10000">加入游戏</button>
     </div>
 
     <div id="gameInfo" style="display: none">

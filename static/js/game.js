@@ -299,6 +299,26 @@ window.onload = function () {
 
   const joinButton = document.getElementById("joinButton");
   const playerNameInput = document.getElementById("playerName");
+  if (playerNameInput) {
+    playerNameInput.addEventListener("keypress", handleEnterKey);
+    console.log("Player name input event listener added");
+
+    // 添加焦点和点击事件监听器
+    playerNameInput.addEventListener("focus", function () {
+      console.log("Input field focused");
+    });
+    playerNameInput.addEventListener("click", function () {
+      console.log("Input field clicked");
+    });
+
+    // 尝试自动聚焦输入框
+    setTimeout(() => {
+      playerNameInput.focus();
+      console.log("Attempted to focus input field");
+    }, 500);
+  } else {
+    console.error("Player name input not found");
+  }
 
   if (joinButton) {
     joinButton.addEventListener("click", joinGame);
