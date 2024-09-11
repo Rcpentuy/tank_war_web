@@ -5,6 +5,8 @@ set -e
 if ! command -v virtualenv &> /dev/null; then
     echo "virtualenv 未安装，正在安装..."
     pip install --user virtualenv
+    # 添加 virtualenv 到 PATH
+    export PATH="$HOME/.local/bin:$PATH"
 fi
 
 # 设置虚拟环境名称
@@ -13,7 +15,7 @@ VENV_NAME="venv"
 # 检查虚拟环境是否存在，如果不存在则创建
 if [ ! -d "$VENV_NAME" ]; then
     echo "创建虚拟环境..."
-    virtualenv $VENV_NAME
+    $HOME/.local/bin/virtualenv $VENV_NAME
 fi
 
 # 激活虚拟环境
