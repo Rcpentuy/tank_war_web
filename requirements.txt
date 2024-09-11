@@ -1,5 +1,6 @@
 Flask==3.0.3
 Flask-SocketIO==5.3.7
+flask_cors
 gunicorn
 eventlet
 python-socketio

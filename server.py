@@ -1,13 +1,15 @@
 from flask import Flask, render_template, request, jsonify, send_from_directory
 from flask_socketio import SocketIO, emit
 from msgpack import packb, unpackb
+from flask_cors import CORS
 import random
 import math
 from threading import Thread
 import time
 
 app = Flask(__name__, static_folder='static')
-socketio = SocketIO(app, async_mode='eventlet', websocket=True, ping_timeout=10, ping_interval=5, compression=True)
+CORS(app)
+socketio = SocketIO(app, async_mode='eventlet', websocket=True, ping_timeout=10, ping_interval=5, compression=True,cors_allowed_origins = '*')
 
 @app.route('/')
 def index():
