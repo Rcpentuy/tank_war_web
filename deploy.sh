@@ -1,12 +1,25 @@
 #!/bin/bash
 set -e
 
+#Ubuntu专用启动脚本，其余系统请手动完成此流程
+
 # 检查是否已安装 virtualenv
 if ! command -v virtualenv &> /dev/null; then
-    echo "virtualenv 未安装，正在安装..."
-    pip install --user virtualenv
-    # 添加 virtualenv 到 PATH
-    export PATH="$HOME/.local/bin:$PATH"
+    echo "virtualenv 未在系统 PATH 中找到，尝试在用户本地路径中查找..."
+    if [ -f "$HOME/.local/bin/virtualenv" ]; then
+        echo "在用户本地路径中找到 virtualenv，添加到 PATH..."
+        export PATH="$HOME/.local/bin:$PATH"
+    else
+        echo "virtualenv 未安装，正在安装..."
+        pip install --user virtualenv
+        export PATH="$HOME/.local/bin:$PATH"
+    fi
+fi
+
+# 再次检查 virtualenv 是否可用
+if ! command -v virtualenv &> /dev/null; then
+    echo "安装 virtualenv 失败，请手动安装并确保其在 PATH 中"
+    exit 1
 fi
 
 # 设置虚拟环境名称
@@ -29,6 +42,13 @@ chmod +x deploy.sh
 
 # 安装或更新依赖
 pip install -r requirements.txt
+
+# 检查并关闭已运行的gunicorn进程
+if pgrep -f "gunicorn.*wsgi:app" > /dev/null; then
+    echo "发现正在运行的gunicorn进程，正在关闭..."
+    pkill -f "gunicorn.*wsgi:app"
+    sleep 2  # 等待进程完全关闭
+fi
 
 # 获取 gunicorn 的完整路径
 GUNICORN_PATH="$VENV_NAME/bin/gunicorn"
