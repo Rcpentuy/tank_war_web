@@ -1,91 +1,39 @@
 #!/bin/bash
 set -e
 
+# 检查是否已安装 virtualenv
+if ! command -v virtualenv &> /dev/null; then
+    echo "virtualenv 未安装，正在安装..."
+    pip install --user virtualenv
+fi
+
+# 设置虚拟环境名称
+VENV_NAME="venv"
+
+# 检查虚拟环境是否存在，如果不存在则创建
+if [ ! -d "$VENV_NAME" ]; then
+    echo "创建虚拟环境..."
+    virtualenv $VENV_NAME
+fi
+
+# 激活虚拟环境
+source $VENV_NAME/bin/activate
+
 # 拉取最新代码
 git pull origin main
 
 # 安装或更新依赖
-pip install -r requirements.txt --quiet --no-input --upgrade --no-deps 2>/dev/null || true
-
-# 检查是否安装了 systemctl
-if ! command -v systemctl &> /dev/null; then
-    echo "systemctl 未安装，正在尝试安装..."
-    
-    # 检测操作系统
-    if [ -f /etc/os-release ]; then
-        . /etc/os-release
-        OS=$NAME
-    else
-        OS=$(uname -s)
-    fi
-    
-    # 根据不同的操作系统安装 systemd
-    case $OS in
-        "Ubuntu"|"Debian GNU/Linux")
-            sudo apt-get update
-            sudo apt-get install -y systemd
-            ;;
-        "CentOS Linux"|"Red Hat Enterprise Linux")
-            sudo yum install -y systemd
-            ;;
-        "Fedora")
-            sudo dnf install -y systemd
-            ;;
-        *)
-            echo "无法识别的操作系统，请手动安装 systemd"
-            exit 1
-            ;;
-    esac
-    
-    echo "systemd 安装完成"
-fi
-
-# 获取当前用户名
-CURRENT_USER=$(whoami)
-
-# 检查 gunicorn 是否安装
-if ! command -v gunicorn &> /dev/null; then
-    echo "gunicorn 未安装，正在安装..."
-    pip3 install --user gunicorn
-fi
+pip install -r requirements.txt
 
 # 获取 gunicorn 的完整路径
-GUNICORN_PATH=$(which gunicorn)
+GUNICORN_PATH="$VENV_NAME/bin/gunicorn"
 
-# 检查服务文件是否存在，如果不存在则创建
-SERVICE_FILE="/etc/systemd/system/tankwar.service"
-if [ ! -f "$SERVICE_FILE" ] || [ "$1" == "--force" ]; then
-    echo "创建 tankwar 服务文件..."
-    sudo tee "$SERVICE_FILE" > /dev/null <<EOT
-[Unit]
-Description=Tank War Game Server
-After=network.target
+# 启动 gunicorn
+echo "启动 gunicorn..."
+$GUNICORN_PATH --worker-class eventlet -w 1 wsgi:app
 
-[Service]
-ExecStart=$GUNICORN_PATH --worker-class eventlet -w 1 wsgi:app
-WorkingDirectory=$(pwd)
-User=$CURRENT_USER
-Group=$CURRENT_USER
-Restart=always
+echo "部署完成，gunicorn 已启动"
 
-[Install]
-WantedBy=multi-user.target
-EOT
-    
-    sudo systemctl daemon-reload
-    sudo systemctl enable tankwar
-fi
-
-# 验证服务文件
-sudo systemctl verify tankwar.service
-
-# 如果验证成功，则重启服务
-if [ $? -eq 0 ]; then
-    sudo systemctl restart tankwar
-    sudo systemctl status tankwar
-else
-    echo "服务文件验证失败，请检查配置"
-    sudo systemctl status tankwar
-fi
-
-echo "部署完成，请检查日志确保一切正常"
+# 注意：此脚本不会自动退出虚拟环境，因为 gunicorn 会在前台运行
+# 如果您想在后台运行 gunicorn，可以在命令前加上 nohup，并在命令后加上 &
+# 例如：nohup $GUNICORN_PATH --worker-class eventlet -w 1 wsgi:app > gunicorn.log 2>&1 &
