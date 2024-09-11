@@ -31,12 +31,14 @@ let lastTime = performance.now();
 const explosionDuration = 500; // 爆炸动画持续时间（毫秒）
 let waitingInterval;
 let gameState = "not_joined"; // 可能的状态: 'not_joined', 'waiting', 'playing'
-
-// 添加新的全局变量
-let mouseX = 0;
-let mouseY = 0;
 let isMoving = false;
 let gameOverTimeout = null;
+let mouseX = 0;
+let mouseY = 0;
+//为移动端设备
+let touchStartTime = 0;
+let touchTimeout = null;
+let isTouchMoving = false;
 
 let lastGameState = null;
 let currentGameState = null;
@@ -325,6 +327,10 @@ window.onload = function () {
   document.addEventListener("mousedown", handleMouseDown);
   document.addEventListener("mouseup", handleMouseUp);
   document.addEventListener("contextmenu", (e) => e.preventDefault());
+
+  document.addEventListener("touchstart", handleTouchStart);
+  document.addEventListener("touchmove", handleTouchMove);
+  document.addEventListener("touchend", handleTouchEnd);
 
   console.log("Mouse event listeners added to document");
 
@@ -638,7 +644,7 @@ function gameLoop(currentTime) {
     updateGameState();
   }
 
-  if (isMoving && players[myId]) {
+  if ((isMoving || isTouchMoving) && players[myId]) {
     const player = players[myId];
     const dx = mouseX - player.x;
     const dy = mouseY - player.y;
@@ -746,6 +752,78 @@ function handleMouseDown(event) {
     // 右键
     console.log("Attempting to fire");
     socket.emit("fire");
+  }
+}
+
+// 添加以下函数来处理触摸事件
+function handleTouchStart(event) {
+  event.preventDefault();
+  const touch = event.touches[0];
+  touchStartTime = Date.now();
+
+  // 设置一个定时器，如果超过 300ms 没有触发 touchend，就认为是长按
+  touchTimeout = setTimeout(() => {
+    isTouchMoving = true;
+    updateTouchPosition(touch);
+  }, 300);
+}
+
+function handleTouchMove(event) {
+  event.preventDefault();
+  if (isTouchMoving) {
+    const touch = event.touches[0];
+    updateTouchPosition(touch);
+  }
+}
+
+function handleTouchEnd(event) {
+  event.preventDefault();
+  clearTimeout(touchTimeout);
+
+  if (isTouchMoving) {
+    isTouchMoving = false;
+    isMoving = false;
+    socket.emit("player_move", { angle: 0, moving: false });
+  } else if (Date.now() - touchStartTime < 300) {
+    // 如果触摸时间小于 300ms，视为单击，触发发射
+    console.log("Attempting to fire");
+    socket.emit("fire");
+  }
+}
+
+function updateTouchPosition(touch) {
+  const rect = gameArea.getBoundingClientRect();
+  const scaleX = gameArea.width.baseVal.value / rect.width;
+  const scaleY = gameArea.height.baseVal.value / rect.height;
+
+  // 计算触摸点在游戏区域内的位置
+  const gameTouchX = (touch.clientX - rect.left) * scaleX;
+  const gameTouchY = (touch.clientY - rect.top) * scaleY;
+
+  // 限制触摸点在游戏区域内
+  mouseX = Math.max(
+    maze_info.offset_x,
+    Math.min(
+      gameTouchX + maze_info.offset_x,
+      maze_info.offset_x + maze_info.width
+    )
+  );
+  mouseY = Math.max(
+    maze_info.offset_y,
+    Math.min(
+      gameTouchY + maze_info.offset_y,
+      maze_info.offset_y + maze_info.height
+    )
+  );
+
+  // 触发移动
+  isMoving = true;
+  if (players[myId]) {
+    const player = players[myId];
+    const dx = mouseX - player.x;
+    const dy = mouseY - player.y;
+    const angle = Math.atan2(dy, dx);
+    socket.emit("player_move", { angle: angle, moving: true });
   }
 }
 
