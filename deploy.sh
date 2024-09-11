@@ -24,6 +24,9 @@ source $VENV_NAME/bin/activate
 # 拉取最新代码
 git pull origin main
 
+# 确保脚本文件具有执行权限
+chmod +x deploy.sh
+
 # 安装或更新依赖
 pip install -r requirements.txt
 
