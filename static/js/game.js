@@ -342,6 +342,12 @@ window.onload = function () {
   // 将 resizeCanvas 的调用移到这里
   window.addEventListener("resize", resizeCanvas);
 
+  // 添加屏幕方向变化监听
+  window.addEventListener("orientationchange", resizeCanvas);
+
+  // 初始调用 resizeCanvas
+  resizeCanvas();
+
   const joinButton = document.getElementById("joinButton");
   const playerNameInput = document.getElementById("playerName");
   if (playerNameInput) {
@@ -981,3 +987,16 @@ socket.on("name_changed", (data) => {
   players[data.id].color = data.new_color;
   updateScoreBoard();
 });
+
+function checkOrientation() {
+  if (window.screen.orientation.type.includes("portrait")) {
+    // 竖屏
+    document.body.classList.add("portrait");
+  } else {
+    // 横屏
+    document.body.classList.remove("portrait");
+  }
+}
+
+window.addEventListener("load", checkOrientation);
+window.screen.orientation.addEventListener("change", checkOrientation);

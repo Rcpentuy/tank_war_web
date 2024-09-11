@@ -253,3 +253,21 @@ button {
 #joinButton:hover {
   background-color: #45a049;
 }
+
+.portrait::after {
+  content: "请旋转设备以获得最佳游戏体验";
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.8);
+  color: white;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 9999;
+  font-size: 24px;
+  text-align: center;
+  padding: 20px;
+}
