@@ -43,6 +43,15 @@ fi
 # 获取当前用户名
 CURRENT_USER=$(whoami)
 
+# 检查 gunicorn 是否安装
+if ! command -v gunicorn &> /dev/null; then
+    echo "gunicorn 未安装，正在安装..."
+    pip install gunicorn
+fi
+
+# 获取 gunicorn 的完整路径
+GUNICORN_PATH=$(which gunicorn)
+
 # 检查服务文件是否存在，如果不存在则创建
 SERVICE_FILE="/etc/systemd/system/tankwar.service"
 if [ ! -f "$SERVICE_FILE" ]; then
@@ -53,7 +62,7 @@ Description=Tank War Game Server
 After=network.target
 
 [Service]
-ExecStart=$(which gunicorn) --worker-class eventlet -w 1 wsgi:app
+ExecStart=$GUNICORN_PATH --worker-class eventlet -w 1 wsgi:app
 WorkingDirectory=$(pwd)
 User=$CURRENT_USER
 Group=$CURRENT_USER
