@@ -46,7 +46,7 @@ CURRENT_USER=$(whoami)
 # 检查 gunicorn 是否安装
 if ! command -v gunicorn &> /dev/null; then
     echo "gunicorn 未安装，正在安装..."
-    pip install gunicorn
+    pip3 install --user gunicorn
 fi
 
 # 获取 gunicorn 的完整路径
@@ -54,7 +54,7 @@ GUNICORN_PATH=$(which gunicorn)
 
 # 检查服务文件是否存在，如果不存在则创建
 SERVICE_FILE="/etc/systemd/system/tankwar.service"
-if [ ! -f "$SERVICE_FILE" ]; then
+if [ ! -f "$SERVICE_FILE" ] || [ "$1" == "--force" ]; then
     echo "创建 tankwar 服务文件..."
     sudo tee "$SERVICE_FILE" > /dev/null <<EOT
 [Unit]
@@ -76,10 +76,16 @@ EOT
     sudo systemctl enable tankwar
 fi
 
-# 重启服务
-sudo systemctl restart tankwar
+# 验证服务文件
+sudo systemctl verify tankwar.service
 
-# 检查服务状态
-sudo systemctl status tankwar
+# 如果验证成功，则重启服务
+if [ $? -eq 0 ]; then
+    sudo systemctl restart tankwar
+    sudo systemctl status tankwar
+else
+    echo "服务文件验证失败，请检查配置"
+    sudo systemctl status tankwar
+fi
 
 echo "部署完成，请检查日志确保一切正常"
