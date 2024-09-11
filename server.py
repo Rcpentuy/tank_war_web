@@ -173,15 +173,14 @@ def handle_latency(data):
     emit('update_latencies', player_latencies, broadcast=True)
 
 def check_game_state():
+    global is_game_running
     if len(players) == 1:
         socketio.emit('waiting_for_players', {'count': len(players)}, namespace='/')
     elif len(players) > 1: 
         socketio.emit('game_start', namespace='/')
-        global is_game_running
         is_game_running = True
     else:
         # 如果没有玩家，重置游戏状态
-        global is_game_running
         is_game_running = False
         reset_game()
 
