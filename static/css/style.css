@@ -8,7 +8,9 @@ body {
   display: flex;
   justify-content: center;
   align-items: center;
-  height: 100vh;
+  height: auto;
+  min-height: 100vh;
+  overflow-y: auto;
   background-color: #f0f0f0;
   font-family: Arial, sans-serif;
 
@@ -40,6 +42,7 @@ body {
 
 #gameContainer {
   position: relative;
+  min-height: 100vh;
 }
 
 #playerInfo {
