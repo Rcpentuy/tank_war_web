@@ -178,7 +178,12 @@ def check_game_state():
     elif len(players) > 1: 
         socketio.emit('game_start', namespace='/')
         global is_game_running
-        is_game_running = True  # 设置游戏状态为运行中
+        is_game_running = True
+    else:
+        # 如果没有玩家，重置游戏状态
+        global is_game_running
+        is_game_running = False
+        reset_game()
 
 @socketio.on('player_join')
 def handle_player_join(data):    
@@ -224,7 +229,12 @@ def handle_disconnect():
         del player_latencies[player_id]  # 移除玩家的延迟记录
         socketio.emit('player_left', {'id': player_id}, namespace='/')
         socketio.emit('update_player_count', {'count': len(players), 'players': [p['name'] for p in players.values()], 'latencies': player_latencies}, namespace='/')
-    
+    check_game_state()
+
+@socketio.on('connect_error')
+def handle_connect_error(error):
+    print(f"Connection error: {error}")
+    handle_disconnect()  # 调用断开连接的处理函数
 
 @socketio.on('change_name')
 def handle_change_name(data):
