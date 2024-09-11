@@ -108,9 +108,6 @@ def generate_walls():
         'offset_y': offset_y
     }
 
-# 在文件顶部，全局变量声明之后添加这行
-generate_walls()
-
 def reset_game():
     global players, bullets
     generate_walls()
@@ -261,22 +258,7 @@ def handle_player_move(data):
             print(f"Player {player_id} new position: x={new_x}, y={new_y}")
         else:
             print(f"Player {player_id} collision detected")
-
-    # # 使用 packb 将数据转换为二进制格式
-    # binary_data = packb({
-    #     'id': player_id,
-    #     'data': {
-    #         'x': player['x'],
-    #         'y': player['y'],
-    #         'angle': player['angle'],
-    #         'moving': player['moving'],
-    #         'alive': player['alive'],
-    #         'color': player['color'],
-    #         'name': player['name']
-    #     }
-    # }, use_bin_type=True)
-
-    # emit('player_updated', binary_data, broadcast=True, binary=True)
+        # 所有数据由send_game_state统一发送，这里不需要打包或者发送数据
 
 @socketio.on('fire')
 def handle_fire():

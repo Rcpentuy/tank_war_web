@@ -646,7 +646,7 @@ function gameLoop(currentTime) {
     socket.emit("player_move", { angle: angle, moving: true });
   }
 
-  //   // 更新子弹位置
+  //   // 非插值法更新子弹位置
   //   bullets.forEach((bullet) => {
   //     bullet.x += Math.cos(bullet.angle) * bullet.speed * (1 / 60); // 假设 60 FPS
   //     bullet.y += Math.sin(bullet.angle) * bullet.speed * (1 / 60);
