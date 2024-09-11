@@ -35,6 +35,8 @@ fi
 source $VENV_NAME/bin/activate
 
 # 拉取最新代码
+git fetch origin main
+git reset --hard origin/main
 git pull origin main
 
 # 确保脚本文件具有执行权限
