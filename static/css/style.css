@@ -11,6 +11,15 @@ body {
   height: 100vh;
   background-color: #f0f0f0;
   font-family: Arial, sans-serif;
+
+  /*移动设备优化*/
+  -webkit-touch-callout: none;
+  -webkit-user-select: none;
+  -khtml-user-select: none;
+  -moz-user-select: none;
+  -ms-user-select: none;
+  user-select: none;
+  -webkit-tap-highlight-color: transparent;
 }
 
 .modal {

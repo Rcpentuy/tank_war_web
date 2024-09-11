@@ -34,6 +34,7 @@ maze_info = {}
 wins = {}  # 用于记录每个玩家的胜利次数
 player_colors = {}  # 用于记录每个玩家的颜色
 player_latencies = {}
+is_game_running = False
 
 def generate_maze(width, height):
     maze = [[0 for _ in range(width)] for _ in range(height)]
@@ -157,9 +158,13 @@ def circle_rectangle_collision(circle_x, circle_y, circle_radius, rect):
 
 @socketio.on('ping')
 def handle_ping(data):
-    client_time = data['clientTime']
-    server_time = int(time.time() * 1000)  # 转换为毫秒
-    emit('pong', {'clientTime': client_time, 'serverTime': server_time})
+    try:
+        client_time = data['clientTime']
+        server_time = int(time.time() * 1000)  # 转换为毫秒
+        emit('pong', {'clientTime': client_time, 'serverTime': server_time})
+    except Exception as e:
+        print(f"Error handling ping: {e}")
+        emit('pong', {'error': 'Internal server error'})
 
 @socketio.on('latency')
 def handle_latency(data):
@@ -167,12 +172,16 @@ def handle_latency(data):
     player_latencies[player_id] = data['latency']
     emit('update_latencies', player_latencies, broadcast=True)
 
+def check_game_state():
+    if len(players) == 1:
+        socketio.emit('waiting_for_players', {'count': len(players)}, namespace='/')
+    elif len(players) > 1: 
+        socketio.emit('game_start', namespace='/')
+        global is_game_running
+        is_game_running = True  # 设置游戏状态为运行中
+
 @socketio.on('player_join')
-def handle_player_join(data):
-    global maze_info
-    if not maze_info:
-        generate_walls()  # 如果 maze_info 为空，重新生成墙壁
-    
+def handle_player_join(data):    
     player_id = request.sid
     if player_id in players:
         # 玩家已经存在，可能是重新连接
@@ -204,11 +213,7 @@ def handle_player_join(data):
     emit('update_player_count', {'count': len(players), 'players': [p['name'] for p in players.values()]}, broadcast=True)
     check_game_state()  # 检查游戏状态
 
-def check_game_state():
-    if len(players) == 1:
-        socketio.emit('waiting_for_players', {'count': len(players)}, namespace='/')
-    elif len(players) > 1:
-        socketio.emit('game_start', namespace='/')
+
 
 @socketio.on('disconnect')
 def handle_disconnect():
@@ -219,7 +224,7 @@ def handle_disconnect():
         del player_latencies[player_id]  # 移除玩家的延迟记录
         socketio.emit('player_left', {'id': player_id}, namespace='/')
         socketio.emit('update_player_count', {'count': len(players), 'players': [p['name'] for p in players.values()], 'latencies': player_latencies}, namespace='/')
-    check_game_state()
+    
 
 @socketio.on('change_name')
 def handle_change_name(data):
@@ -309,6 +314,9 @@ def reflect_bullet(bullet, wall):
     
 
 def update_game():
+    if not is_game_running:
+        check_game_state()
+
     global bullets
     bullets_to_remove = []
     for bullet in bullets:
@@ -401,6 +409,9 @@ def run_game_loop():
 
 @socketio.on('restart_game')
 def handle_restart_game():
+    global maze_info
+    if not maze_info:
+        generate_walls()  # 如果 maze_info 为空，重新生成墙壁
     global players, bullets
     players = {}
     bullets = []

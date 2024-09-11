@@ -46,12 +46,17 @@ let interpolationFactor = 0;
 const INTERPOLATION_DURATION = 50; // 插值持续时间（毫秒）
 let lastUpdateTime = 0;
 
+let gameOverPending = false;
+let pendingWinner = null;
+
 function measureLatency() {
   const start = performance.now();
   socket.emit("ping", { clientTime: start }, (serverResponse) => {
-    const end = performance.now();
-    const latency = Math.round(end - serverResponse.serverTime);
-    socket.emit("latency", { latency: latency });
+    if (serverResponse && serverResponse.serverTime) {
+      const end = performance.now();
+      const latency = Math.round(end - serverResponse.serverTime);
+      socket.emit("latency", { latency: latency });
+    }
   });
 }
 
@@ -298,6 +303,8 @@ function resizeCanvas() {
 
 // 修改 window.onload 函数
 window.onload = function () {
+  setInterval(measureLatency, 5000); // 每5秒测量一次延迟
+
   console.log("Window loaded");
   gameArea = document.createElementNS(svgNS, "svg");
   gameArea.id = "gameArea";
@@ -310,13 +317,11 @@ window.onload = function () {
     }
   });
 
-  setInterval(measureLatency, 5000); // 每5秒测量一次延迟
-
   const savedName = localStorage.getItem("playerName");
   if (savedName) {
     console.log("Saved name found:", savedName);
     showPlayerInfo(savedName);
-    socket.emit("player_join", { name: savedName });
+    socket.emit("player_join", { name: savedName }); //改为rejoin？
   } else {
     console.log("No saved name, showing join form");
     showJoinForm();
@@ -328,9 +333,9 @@ window.onload = function () {
   document.addEventListener("mouseup", handleMouseUp);
   document.addEventListener("contextmenu", (e) => e.preventDefault());
 
-  document.addEventListener("touchstart", handleTouchStart);
-  document.addEventListener("touchmove", handleTouchMove);
-  document.addEventListener("touchend", handleTouchEnd);
+  gameArea.addEventListener("touchstart", handleTouchStart);
+  gameArea.addEventListener("touchmove", handleTouchMove);
+  gameArea.addEventListener("touchend", handleTouchEnd);
 
   console.log("Mouse event listeners added to document");
 
@@ -559,11 +564,17 @@ socket.on("update_player_count", (data) => {
 });
 
 socket.on("game_over", (data) => {
-  document.getElementById("winnerName").textContent = data.winner;
+  console.log("游戏结束:", data);
   wins = data.wins;
   updateScoreBoard();
-  document.getElementById("gameOverModal").style.display = "block";
-  isGameRunning = false;
+
+  // 检查是否有正在进行的爆炸动画
+  if (explosions.length > 0) {
+    gameOverPending = true;
+    pendingWinner = data.winner;
+  } else {
+    showGameOver(data.winner);
+  }
 });
 
 // 添加 showPlayerInfo 数
@@ -658,6 +669,23 @@ function gameLoop(currentTime) {
   //     bullet.y += Math.sin(bullet.angle) * bullet.speed * (1 / 60);
   //   });
   drawPlayers();
+
+  // 更新和绘制爆炸
+  explosions = explosions.filter((explosion) => {
+    const elapsedTime = currentTime - explosion.startTime;
+    if (elapsedTime < explosionDuration) {
+      explosion.frame = Math.floor((elapsedTime / explosionDuration) * 30);
+      return true;
+    }
+    return false;
+  });
+
+  // 检查是否所有爆炸动画都已结束，且有待处理的游戏结束事件
+  if (gameOverPending && explosions.length === 0) {
+    showGameOver(pendingWinner);
+    gameOverPending = false;
+    pendingWinner = null;
+  }
 }
 
 function updateGameState() {
@@ -717,8 +745,12 @@ function handleMouseMove(event) {
     return;
   }
 
+  // 这段代码用于获取游戏区域的位置和缩放比例
+  // 获取游戏区域元素的边界矩形
   const rect = gameArea.getBoundingClientRect();
+  // 计算游戏区域在水平方向的缩放比例
   const scaleX = gameArea.width.baseVal.value / rect.width;
+  // 计算游戏区域在垂直方向的缩放比例
   const scaleY = gameArea.height.baseVal.value / rect.height;
 
   // 计算鼠标在游戏区域内的位置
@@ -759,7 +791,7 @@ function handleMouseDown(event) {
 function handleTouchStart(event) {
   event.preventDefault();
   const touch = event.touches[0];
-  touchStartTime = Date.now();
+  touchStartTime = performance.now();
 
   // 设置一个定时器，如果超过 300ms 没有触发 touchend，就认为是长按
   touchTimeout = setTimeout(() => {
@@ -783,8 +815,9 @@ function handleTouchEnd(event) {
   if (isTouchMoving) {
     isTouchMoving = false;
     isMoving = false;
-    socket.emit("player_move", { angle: 0, moving: false });
-  } else if (Date.now() - touchStartTime < 300) {
+    const currentAngle = players[myId] ? players[myId].angle : 0;
+    socket.emit("player_move", { angle: currentAngle, moving: false });
+  } else if (performance.now() - touchStartTime < 300) {
     // 如果触摸时间小于 300ms，视为单击，触发发射
     console.log("Attempting to fire");
     socket.emit("fire");
@@ -829,7 +862,13 @@ function updateTouchPosition(touch) {
 
 // 确保这个事件监听器被正确添加
 document.addEventListener("mousedown", handleMouseDown);
-document.addEventListener("contextmenu", (e) => e.preventDefault());
+document.addEventListener(
+  "contextmenu",
+  function (e) {
+    e.preventDefault();
+  },
+  false
+);
 
 // 修改 handleMouseUp 函数
 function handleMouseUp(event) {
@@ -868,7 +907,7 @@ socket.on("player_killed", (data) => {
 
 // 修改 addExplosion 函数
 function addExplosion(x, y) {
-  explosions.push({ x: x, y: y, frame: 0 });
+  explosions.push({ x: x, y: y, frame: 0, startTime: performance.now() });
 }
 
 socket.on("player_updated", (binaryData) => {
@@ -900,13 +939,6 @@ function showGameOver(winner) {
 
   isGameRunning = false;
 }
-
-socket.on("game_over", (data) => {
-  console.log("游戏结束:", data);
-  wins = data.wins;
-  updateScoreBoard();
-  showGameOver(data.winner);
-});
 
 // 添加这个函数
 function showChangeNameForm() {
