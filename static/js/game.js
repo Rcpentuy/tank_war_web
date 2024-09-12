@@ -2,7 +2,7 @@ const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
 const host = window.location.hostname;
 const port = window.location.port || (protocol === "wss:" ? "443" : "80");
 
-const msgpack = MessagePack;
+const msgpack = window.msgpack;
 
 const socket = io(`${protocol}//${host}:${port}`, {
   transports: ["websocket", "polling"],
