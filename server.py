@@ -212,11 +212,7 @@ def handle_player_join(data):
     respawn_player(player_id)
     player_latencies[player_id] = 0  # 初始化延迟
     
-    # 向新加入的玩家发送他们自己的 ID
-    emit('player_joined', {'id': player_id, 'players': players, 'walls': walls, 'maze_info': maze_info, 'wins': wins})
-    
-    # 向其他玩家广播新玩家加入的消息，但不包括 ID
-    emit('player_joined', {'players': players, 'walls': walls, 'maze_info': maze_info, 'wins': wins}, broadcast=True, include_self=False)
+    emit('player_joined', {'new_player_id': player_id, 'players': players, 'walls': walls, 'maze_info': maze_info, 'wins': wins}, broadcast=True)
     
     emit('update_player_count', {'count': len(players), 'players': [p['name'] for p in players.values()]}, broadcast=True)
     check_game_state()  # 检查游戏状态
