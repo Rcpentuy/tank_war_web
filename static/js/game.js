@@ -33,8 +33,9 @@ let waitingInterval;
 let gameState = "not_joined"; // 可能的状态: 'not_joined', 'waiting', 'playing'
 let isMoving = false;
 let gameOverTimeout = null;
-let mouseX = 0;
-let mouseY = 0;
+let targetX = 0;
+let targetY = 0;
+
 //为移动端设备
 let touchStartTime = 0;
 let touchTimeout = null;
@@ -301,7 +302,6 @@ function resizeCanvas() {
   }
 }
 
-// 修改 window.onload 函数
 window.onload = function () {
   setInterval(measureLatency, 5000); // 每5秒测量一次延迟
 
@@ -667,10 +667,20 @@ function gameLoop(currentTime) {
 
   if ((isMoving || isTouchMoving) && players[myId]) {
     const player = players[myId];
-    const dx = mouseX - player.x;
-    const dy = mouseY - player.y;
+    const dx = targetX - player.x;
+    const dy = targetY - player.y;
+    const distanceToTarget = Math.sqrt(dx * dx + dy * dy);
     const angle = Math.atan2(dy, dx);
-    socket.emit("player_move", { angle: angle, moving: true });
+
+    if (distanceToTarget > 5) {
+      // 如果距离目标还有一定距离，继续移动
+      socket.emit("player_move", { angle: angle, moving: true });
+    } else {
+      // 如果已经接近目标，停止移动
+      isMoving = false;
+      isTouchMoving = false;
+      socket.emit("player_move", { angle: angle, moving: false });
+    }
   }
 
   //   // 非插值法更新子弹位置
@@ -774,15 +784,14 @@ function handleMouseMove(event) {
   const gameMouseX = (event.clientX - rect.left) * scaleX;
   const gameMouseY = (event.clientY - rect.top) * scaleY;
 
-  // 限制鼠标置在游戏区域内
-  mouseX = Math.max(
+  targetX = Math.max(
     maze_info.offset_x,
     Math.min(
       gameMouseX + maze_info.offset_x,
       maze_info.offset_x + maze_info.width
     )
   );
-  mouseY = Math.max(
+  targetY = Math.max(
     maze_info.offset_y,
     Math.min(
       gameMouseY + maze_info.offset_y,
@@ -797,6 +806,7 @@ function handleMouseDown(event) {
   if (event.button === 0) {
     // 左键
     isMoving = true;
+    handleMouseMove(event); // 立即更新目标位置
   } else if (event.button === 2) {
     // 右键
     console.log("Attempting to fire");
@@ -851,14 +861,14 @@ function updateTouchPosition(touch) {
   const gameTouchY = (touch.clientY - rect.top) * scaleY;
 
   // 限制触摸点在游戏区域内
-  mouseX = Math.max(
+  targetX = Math.max(
     maze_info.offset_x,
     Math.min(
       gameTouchX + maze_info.offset_x,
       maze_info.offset_x + maze_info.width
     )
   );
-  mouseY = Math.max(
+  targetY = Math.max(
     maze_info.offset_y,
     Math.min(
       gameTouchY + maze_info.offset_y,
@@ -870,8 +880,8 @@ function updateTouchPosition(touch) {
   isMoving = true;
   if (players[myId]) {
     const player = players[myId];
-    const dx = mouseX - player.x;
-    const dy = mouseY - player.y;
+    const dx = targetX - player.x;
+    const dy = targetY - player.y;
     const angle = Math.atan2(dy, dx);
     socket.emit("player_move", { angle: angle, moving: true });
   }
