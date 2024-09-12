@@ -57,7 +57,7 @@ GUNICORN_PATH="$VENV_NAME/bin/gunicorn"
 
 # 启动 gunicorn
 echo "启动 gunicorn..."
-$GUNICORN_PATH --worker-class eventlet -w 1 wsgi:app
+nohup $GUNICORN_PATH --worker-class eventlet -w 1 wsgi:app &
 
 echo "部署完成，gunicorn 已启动"
 
