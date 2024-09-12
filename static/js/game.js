@@ -50,6 +50,9 @@ let lastUpdateTime = 0;
 let gameOverPending = false;
 let pendingWinner = null;
 
+let lastFireTime = 0;
+const FIRE_COOLDOWN = 300; // 冷却时间，单位为毫秒
+
 function measureLatency() {
   const start = performance.now();
   socket.emit("ping", { clientTime: start }, (serverResponse) => {
@@ -809,8 +812,14 @@ function handleMouseDown(event) {
     handleMouseMove(event); // 立即更新目标位置
   } else if (event.button === 2) {
     // 右键
-    console.log("Attempting to fire");
-    socket.emit("fire");
+    const currentTime = performance.now();
+    if (currentTime - lastFireTime >= FIRE_COOLDOWN) {
+      console.log("Attempting to fire");
+      socket.emit("fire");
+      lastFireTime = currentTime;
+    } else {
+      console.log("Fire on cooldown");
+    }
   }
 }
 
@@ -846,8 +855,14 @@ function handleTouchEnd(event) {
     socket.emit("player_move", { angle: currentAngle, moving: false });
   } else if (performance.now() - touchStartTime < 300) {
     // 如果触摸时间小于 300ms，视为单击，触发发射
-    console.log("Attempting to fire");
-    socket.emit("fire");
+    const currentTime = performance.now();
+    if (currentTime - lastFireTime >= FIRE_COOLDOWN) {
+      console.log("Attempting to fire");
+      socket.emit("fire");
+      lastFireTime = currentTime;
+    } else {
+      console.log("Fire on cooldown");
+    }
   }
 }
 
