@@ -6,6 +6,7 @@ import random
 import math
 from threading import Thread
 import time
+import logging
 
 app = Flask(__name__, static_folder='static')
 CORS(app)
@@ -35,6 +36,9 @@ wins = {}  # 用于记录每个玩家的胜利次数
 player_colors = {}  # 用于记录每个玩家的颜色
 player_latencies = {}
 is_game_running = False
+
+logging.basicConfig(level=logging.DEBUG)
+logger = logging.getLogger(__name__)
 
 def generate_maze(width, height):
     maze = [[0 for _ in range(width)] for _ in range(height)]
@@ -224,10 +228,16 @@ def handle_disconnect():
     player_id = request.sid
     if player_id in players:
         del players[player_id]
-        del wins[player_id]
-        del player_latencies[player_id]  # 移除玩家的延迟记录
-        socketio.emit('player_left', {'id': player_id}, namespace='/')
-        socketio.emit('update_player_count', {'count': len(players), 'players': [p['name'] for p in players.values()], 'latencies': player_latencies}, namespace='/')
+        print(f'Player {player_id} disconnected, current players: {players}')
+        if player_id in wins:
+            del wins[player_id]
+        if player_id in player_latencies:
+            del player_latencies[player_id]
+        try:
+            socketio.emit('player_left', {'id': player_id}, namespace='/')
+            socketio.emit('update_player_count', {'count': len(players), 'players': [p['name'] for p in players.values()], 'latencies': player_latencies}, namespace='/')
+        except Exception as e:
+            print(f"Error during disconnect: {e}")
     check_game_state()
 
 @socketio.on('connect_error')
@@ -409,12 +419,24 @@ def start_game_loop():
 
 def send_game_state():
     game_state = {
-        'players': {id: {'x': p['x'], 'y': p['y'], 'angle': p['angle'], 'alive': p['alive']} for id, p in players.items()},
-        'bullets': [{'x': b['x'], 'y': b['y'], 'angle': b['angle'], 'speed': 5, 'id': id(b)} for b in bullets]    }
+        'players': {id: {
+            'x': p['x'], 
+            'y': p['y'], 
+            'angle': p['angle'], 
+            'alive': p['alive'],
+            'color': p['color'],
+            'name': p['name']
+        } for id, p in players.items()},
+        'bullets': [{'x': b['x'], 'y': b['y'], 'angle': b['angle'], 'speed': 5, 'id': id(b)} for b in bullets]
+    }
     socketio.emit('game_state', packb(game_state), namespace='/')
 
 def run_game_loop():
-    Thread(target=start_game_loop).start()
+    try:
+        Thread(target=start_game_loop).start()
+    except Exception as e:
+        logger.error(f"Error starting game loop: {e}")
+        logger.exception("Exception details:")
 
 @socketio.on('restart_game')
 def handle_restart_game():
@@ -431,7 +453,17 @@ def handle_restart_game():
     # 让所有连接的客户端重新加入游戏
     socketio.emit('rejoin_game', namespace='/')
 
+@socketio.on_error_default
+def default_error_handler(e):
+    logger.error(f"An error occurred: {e}")
+    logger.exception("Exception details:")
+
 if __name__ == '__main__':
-    generate_walls()
-    run_game_loop()
-    socketio.run(app, host='0.0.0.0', port=25000, debug=False)
+    try:
+        generate_walls()
+        run_game_loop()
+        socketio.run(app, host='0.0.0.0', port=25000, debug=False)
+    except KeyboardInterrupt:
+        print("Shutting down server...")
+    finally:
+        socketio.stop()

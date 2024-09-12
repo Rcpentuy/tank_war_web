@@ -549,11 +549,15 @@ socket.on("update_latencies", (latencies) => {
 
 socket.on("player_left", (data) => {
   console.log("Player left:", data.id);
-  if (players[data.id]) {
-    delete players[data.id];
-  }
+
   if (playerLatencies[data.id]) {
     delete playerLatencies[data.id];
+  }
+  if (players[data.id]) {
+    delete players[data.id];
+    console.log("Player removed from local data");
+  } else {
+    console.log("Player not found in local data");
   }
   updatePlayerList();
   drawPlayers(); // 重新绘制游戏画面
@@ -732,6 +736,13 @@ function updateGameState() {
       return currentBullet;
     }
   });
+  // 删除不再存在的玩家
+  for (let id in players) {
+    if (!currentGameState.players[id]) {
+      delete players[id];
+      console.log(`玩家 ${id} 已从游戏中移除`);
+    }
+  }
 }
 
 function lerp(start, end, factor) {
@@ -1000,3 +1011,7 @@ function checkOrientation() {
 
 window.addEventListener("load", checkOrientation);
 window.screen.orientation.addEventListener("change", checkOrientation);
+
+window.addEventListener("beforeunload", () => {
+  socket.disconnect();
+});
