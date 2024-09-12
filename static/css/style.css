@@ -87,9 +87,6 @@ body {
   cursor: pointer;
 }
 
-canvas {
-  display: block;
-}
 #joinForm,
 #changeNameForm {
   position: absolute;
