@@ -1,7 +1,7 @@
 from app import socketio
 from flask import request
 from flask_socketio import emit
-from game_state import players, bullets, walls, maze_info, wins, player_latencies, player_colors, TANK_WIDTH, TANK_HEIGHT
+from game_state import players, bullets, walls, maze_info, wins, player_latencies, player_colors, TANK_WIDTH, TANK_HEIGHT, TANK_SPEED
 from game_logic import respawn_player, check_game_state, reset_game, reflect_laser
 from utils import circle_rectangle_collision
 from game_logic import lasers, generate_walls
@@ -82,7 +82,7 @@ def handle_player_move(data):
     if not player['alive']:
         return
 
-    speed = 1.5
+    speed = TANK_SPEED
     player['angle'] = data['angle']
     player['moving'] = data['moving']
 
@@ -98,9 +98,8 @@ def handle_player_move(data):
         if not any(circle_rectangle_collision(new_x, new_y, tank_radius, wall) for wall in walls):
             player['x'] = new_x
             player['y'] = new_y
-            # print(f"Player {player_id} new position: x={new_x}, y={new_y}")
-        # else:
-            # print(f"Player {player_id} collision detected")
+    
+        
         # 所有数据由send_game_state统一发送，这里不需要打包或者发送数据
 
 @socketio.on('fire')
