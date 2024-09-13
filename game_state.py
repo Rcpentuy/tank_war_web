@@ -36,7 +36,7 @@ last_crystal_spawn_time = time.time()
 BULLET_SPEED = 5
 TANK_SPEED = 1.5
 MAX_BULLET_BOUNCES = 10
-LASER_DURATION = 0.1  # 激光持续时间为0.1秒
+LASER_DURATION = 10  # 激光武器持续时间为10秒
 MAX_LASER_BOUNCES = 3
 
 # 游戏更新频率

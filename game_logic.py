@@ -214,6 +214,7 @@ def reset_game():
     global players, bullets
     generate_walls()
     bullets.clear()
+    crystals.clear()
     for player_id in list(players.keys()):
         respawn_player(player_id)
     socketio.emit('game_reset', {'walls': walls, 'players': players, 'maze_info': maze_info, 'wins': wins}, namespace='/')
@@ -291,12 +292,6 @@ def generate_walls():
         'offset_x': offset_x,
         'offset_y': offset_y
     })
-    # maze_info ={
-    #     'width': maze_actual_width,
-    #     'height': maze_actual_height,
-    #     'offset_x': offset_x,
-    #     'offset_y': offset_y
-    # }
     
 def reflect_bullet(bullet, wall):
     # 计算墙壁的法线向量

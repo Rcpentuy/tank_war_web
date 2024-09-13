@@ -306,16 +306,20 @@ function drawPlayers() {
   });
 
   // 绘制水晶
+  // 绘制并过滤水晶
   crystals = crystals.filter((crystal) => {
     const elapsedTime = performance.now() - crystal.spawnTime;
-    if (elapsedTime < 5000) {
+    if (elapsedTime < 4000) {
+      // 如果水晶存在时间少于4秒，正常绘制
       drawCrystal(crystal.x, crystal.y);
       return true;
-    } else if (elapsedTime < 6000) {
-      const fadeProgress = (elapsedTime - 5000) / 1000;
+    } else if (elapsedTime < 5000) {
+      // 如果水晶存在时间在4-5秒之间，开始淡出效果
+      const fadeProgress = (elapsedTime - 4000) / 1000;
       drawCrystal(crystal.x, crystal.y, 1 - fadeProgress);
       return true;
     }
+    // 如果水晶存在时间超过5秒，从数组中移除
     return false;
   });
 
@@ -559,6 +563,7 @@ socket.on("game_reset", (data) => {
   maze_info = data.maze_info;
   players = {};
   bullets = [];
+  crystals = [];
   wins = data.wins;
   adjustCanvasSize();
   updateScoreBoard();
@@ -574,7 +579,6 @@ socket.on("game_reset", (data) => {
 
 // 修改 "player_joined" 事件处理函数
 socket.on("player_joined", (data) => {
-  console.log("Player joined event received", data);
   players = data.players;
   walls = data.walls;
   maze_info = data.maze_info;
@@ -709,7 +713,7 @@ function showWaitingScreen() {
 
 // 修改 game_state 事件处理
 socket.on("game_state", (binaryData) => {
-  console.log("game_state received");
+  // console.log("game_state received");
   try {
     const decodedData = msgpack.decode(new Uint8Array(binaryData));
     lastGameState = currentGameState;
@@ -721,20 +725,29 @@ socket.on("game_state", (binaryData) => {
     // players = currentGameState.players;
     // bullets = currentGameState.bullets;
     lasers = currentGameState.lasers;
+    // 移除不再存在的水晶
+    crystals = crystals.filter((crystal) =>
+      currentGameState.crystals.some(
+        (serverCrystal) =>
+          serverCrystal.x === crystal.x && serverCrystal.y === crystal.y
+      )
+    );
     // 更新水晶，但不覆盖现有的水晶
-    currentGameState.crystals.forEach((serverCrystal) => {
-      if (
-        !crystals.some(
-          (c) => c.x === serverCrystal.x && c.y === serverCrystal.y
-        )
-      ) {
-        crystals.push({
-          x: serverCrystal.x,
-          y: serverCrystal.y,
-          spawnTime: serverCrystal.spawn_time * 1000, // 转换为毫秒
-        });
-      }
-    });
+    // currentGameState.crystals.forEach((serverCrystal) => {
+    //   if (
+    //     // 检查当前水晶是否已存在于本地水晶数组中
+    //     // 如果不存在（返回 false），则添加新的水晶
+    //     !crystals.some(
+    //       (c) => c.x === serverCrystal.x && c.y === serverCrystal.y
+    //     )
+    //   ) {
+    //     crystals.push({
+    //       x: serverCrystal.x,
+    //       y: serverCrystal.y,
+    //       spawnTime: serverCrystal.spawn_time * 1000, // 转换为毫秒
+    //     });
+    //   }
+    // });
   } catch (error) {
     console.error("Error decoding game state:", error);
   }
@@ -782,7 +795,7 @@ function gameLoop(currentTime) {
   //   });
   drawPlayers();
 
-  console.log("Current crystal count:", crystals.length); // 添加日志
+  // console.log("Current crystal count:", crystals.length); // 添加日志
 
   // 检查是否所有爆炸动画都已结束，且有待处理的游戏结束事件
   if (gameOverPending && explosions.length === 0) {
@@ -842,8 +855,6 @@ function updateGameState() {
       }
     });
 
-    // 更新水晶
-    // crystals = currentGameState.crystals;
     lasers = currentGameState.lasers;
 
     // 删除不再存在的玩家
