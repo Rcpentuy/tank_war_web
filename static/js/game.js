@@ -530,13 +530,13 @@ socket.on("rejoin_game", () => {
   }
 });
 
-// 确认字体加载完成后再开始游戏
-document.fonts.load('12px "GNU Unifont"').then(() => {
-  if (localStorage.getItem("playerName") && gameArea) {
-    isGameRunning = true;
-    requestAnimationFrame(gameLoop);
-  }
-});
+// // 确认字体加载完成后再开始游戏
+// document.fonts.load('12px "GNU Unifont"').then(() => {
+//   if (localStorage.getItem("playerName") && gameArea) {
+//     isGameRunning = true;
+//     requestAnimationFrame(gameLoop);
+//   }
+// });
 
 function restartGame() {
   console.log("Restarting game...");
@@ -707,6 +707,38 @@ function showWaitingScreen() {
   gameState = "waiting";
 }
 
+// 修改 game_state 事件处理
+socket.on("game_state", (binaryData) => {
+  try {
+    const decodedData = msgpack.decode(new Uint8Array(binaryData));
+    lastGameState = currentGameState;
+    currentGameState = decodedData;
+    lastUpdateTime = performance.now();
+    interpolationFactor = 0;
+
+    // 更新本地游戏状态
+    // players = currentGameState.players;
+    // bullets = currentGameState.bullets;
+    lasers = currentGameState.lasers;
+    // 更新水晶，但不覆盖现有的水晶
+    currentGameState.crystals.forEach((serverCrystal) => {
+      if (
+        !crystals.some(
+          (c) => c.x === serverCrystal.x && c.y === serverCrystal.y
+        )
+      ) {
+        crystals.push({
+          x: serverCrystal.x,
+          y: serverCrystal.y,
+          spawnTime: serverCrystal.spawn_time * 1000, // 转换为毫秒
+        });
+      }
+    });
+  } catch (error) {
+    console.error("Error decoding game state:", error);
+  }
+});
+
 // 修改 gameLoop 函数
 function gameLoop(currentTime) {
   if (!isGameRunning || !gameArea) {
@@ -748,30 +780,6 @@ function gameLoop(currentTime) {
   //     bullet.y += Math.sin(bullet.angle) * bullet.speed * (1 / 60);
   //   });
   drawPlayers();
-
-  // 更新和绘制爆炸
-  explosions = explosions.filter((explosion) => {
-    const elapsedTime = currentTime - explosion.startTime;
-    if (elapsedTime < explosionDuration) {
-      explosion.frame = Math.floor((elapsedTime / explosionDuration) * 30);
-      return true;
-    }
-    return false;
-  });
-
-  // 绘制水晶
-  crystals = crystals.filter((crystal) => {
-    const elapsedTime = currentTime - crystal.spawnTime;
-    if (elapsedTime < 5000) {
-      drawCrystal(crystal.x, crystal.y);
-      return true;
-    } else if (elapsedTime < 6000) {
-      const fadeProgress = (elapsedTime - 5000) / 1000;
-      drawCrystal(crystal.x, crystal.y, 1 - fadeProgress);
-      return true;
-    }
-    return false;
-  });
 
   console.log("Current crystal count:", crystals.length); // 添加日志
 
@@ -835,6 +843,7 @@ function updateGameState() {
 
     // 更新水晶
     // crystals = currentGameState.crystals;
+    lasers = currentGameState.lasers;
 
     // 删除不再存在的玩家
     for (let id in players) {
@@ -885,28 +894,12 @@ function calculateHexagonPoints(centerX, centerY, radius) {
 
 // 添加处理激光的函数
 function drawLaser(startX, startY, endX, endY) {
-  if (
-    typeof startX !== "number" ||
-    typeof startY !== "number" ||
-    typeof endX !== "number" ||
-    typeof endY !== "number"
-  ) {
-    console.error("Invalid laser coordinates:", { startX, startY, endX, endY });
-    return;
-  }
-
   console.log("Drawing laser with coordinates:", {
     startX,
     startY,
     endX,
     endY,
   }); // 添加这行日志
-
-  // 检查 gameArea 是否存在
-  if (!gameArea) {
-    console.error("gameArea is not defined");
-    return;
-  }
 
   const laser = createSVGElement("line", {
     x1: startX - maze_info.offset_x,
@@ -920,38 +913,6 @@ function drawLaser(startX, startY, endX, endY) {
   gameArea.appendChild(laser);
   console.log("Laser element added to gameArea:", laser);
 }
-
-// 修改 game_state 事件处理
-socket.on("game_state", (binaryData) => {
-  try {
-    const decodedData = msgpack.decode(new Uint8Array(binaryData));
-    lastGameState = currentGameState;
-    currentGameState = decodedData;
-    lastUpdateTime = performance.now();
-    interpolationFactor = 0;
-
-    // 更新本地游戏状态
-    players = currentGameState.players;
-    bullets = currentGameState.bullets;
-    lasers = currentGameState.lasers;
-    // 更新水晶，但不覆盖现有的水晶
-    currentGameState.crystals.forEach((serverCrystal) => {
-      if (
-        !crystals.some(
-          (c) => c.x === serverCrystal.x && c.y === serverCrystal.y
-        )
-      ) {
-        crystals.push({
-          x: serverCrystal.x,
-          y: serverCrystal.y,
-          spawnTime: serverCrystal.spawn_time * 1000, // 转换为毫秒
-        });
-      }
-    });
-  } catch (error) {
-    console.error("Error decoding game state:", error);
-  }
-});
 
 // 添加新的 socket 事件监听器
 socket.on("crystal_spawned", (data) => {
@@ -1131,14 +1092,6 @@ function handleMouseUp(event) {
   }
 }
 
-// 处理游戏状态更新
-socket.on("game_state", (binaryData) => {
-  lastGameState = currentGameState;
-  currentGameState = msgpack.decode(new Uint8Array(binaryData));
-  lastUpdateTime = performance.now();
-  interpolationFactor = 0;
-});
-
 // 处理玩家被击杀事件
 socket.on("player_killed", (data) => {
   console.log("Player killed:", data);
@@ -1158,22 +1111,6 @@ socket.on("player_killed", (data) => {
 function addExplosion(x, y) {
   explosions.push({ x: x, y: y, frame: 0, startTime: performance.now() });
 }
-
-// 处理玩家更新事件
-socket.on("player_updated", (binaryData) => {
-  try {
-    // 解码二进制数据
-    const data = msgpack.decode(new Uint8Array(binaryData));
-
-    if (data.id in players) {
-      players[data.id] = data.data;
-    } else {
-      console.log(`Received update for unknown player ${data.id}`);
-    }
-  } catch (error) {
-    console.error("Error decoding player update data:", error);
-  }
-});
 
 // 显示游戏结束界面
 function showGameOver(winner) {
