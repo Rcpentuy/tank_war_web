@@ -44,26 +44,21 @@ def update_game():
         dx = math.cos(bullet['angle']) * speed
         dy = math.sin(bullet['angle']) * speed
         
-        # 使用多个中间点进行碰撞检测
-        steps = 5
-        for i in range(1, steps + 1):
-            new_x = bullet['x'] + dx * i / steps
-            new_y = bullet['y'] + dy * i / steps
-            
-            collision = False
-            for wall in walls:
-                if circle_rectangle_collision(new_x, new_y, 2, wall):
-                    collision = True
-                    reflect_bullet(bullet, wall)
-                    bullet['bounces'] += 1
-                    break
-            
-            if collision:
+        # 单点碰撞检测
+        new_x = bullet['x'] + dx
+        new_y = bullet['y'] + dy
+        
+        collision = False
+        for wall in walls:
+            if circle_rectangle_collision(new_x, new_y, 2, wall):
+                collision = True
+                reflect_bullet(bullet, wall)
+                bullet['bounces'] += 1
                 break
         
         if not collision:
-            bullet['x'] += dx
-            bullet['y'] += dy
+            bullet['x'] = new_x
+            bullet['y'] = new_y
         
         # 检查玩家碰撞
         for player_id, player in players.items():
