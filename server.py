@@ -1,6 +1,7 @@
 from flask import Flask, render_template, request, jsonify, send_from_directory
 from flask_socketio import SocketIO, emit
 from msgpack import packb, unpackb
+import msgpack
 from flask_cors import CORS
 import random
 import math
@@ -36,6 +37,7 @@ wins = {}  # 用于记录每个玩家的胜利次数
 player_colors = {}  # 用于记录每个玩家的颜色
 player_latencies = {}
 is_game_running = False
+lasers = []
 
 logging.basicConfig(level=logging.DEBUG)
 logger = logging.getLogger(__name__)
@@ -279,9 +281,9 @@ def handle_player_move(data):
         if not any(circle_rectangle_collision(new_x, new_y, tank_radius, wall) for wall in walls):
             player['x'] = new_x
             player['y'] = new_y
-            print(f"Player {player_id} new position: x={new_x}, y={new_y}")
-        else:
-            print(f"Player {player_id} collision detected")
+            # print(f"Player {player_id} new position: x={new_x}, y={new_y}")
+        # else:
+            # print(f"Player {player_id} collision detected")
         # 所有数据由send_game_state统一发送，这里不需要打包或者发送数据
 
 @socketio.on('fire')
@@ -291,25 +293,39 @@ def handle_fire():
         return
     
     player = players[player_id]
-    print(f"Player {player_id} fired a bullet")
+    current_time = time.time()
     
     # 坦克中心到炮口的距离
     barrel_length = max(TANK_WIDTH, TANK_HEIGHT) / 2 + 5  # 确保子弹在坦克外部生成
     
     # 计算炮口位置
-    bullet_start_x = player['x'] + math.cos(player['angle']) * barrel_length
-    bullet_start_y = player['y'] + math.sin(player['angle']) * barrel_length
+    fire_start_x = player['x'] + math.cos(player['angle']) * barrel_length
+    fire_start_y = player['y'] + math.sin(player['angle']) * barrel_length
     
-    bullet = {
-        'x': bullet_start_x,
-        'y': bullet_start_y,
-        'angle': player['angle'],
-        'owner': player_id,
-        'bounces': 0
-    }
-    bullets.append(bullet)
-    print(f"Bullet created: {bullet}")
-    # socketio.emit('update_bullets', bullets, namespace='/')
+    if current_time <= player.get('laser_end_time', 0):
+        # 发射激光
+        laser = {
+            'x': fire_start_x,
+            'y': fire_start_y,
+            'angle': player['angle'],
+            'owner': player_id,
+            'bounces': 0,
+            'creation_time': current_time
+        }
+        lasers.append(laser)
+    else:
+        # 发射普通子弹
+        print(f"Player {player_id} fired a bullet")
+        
+        bullet = {
+            'x': fire_start_x,
+            'y': fire_start_y,
+            'angle': player['angle'],
+            'owner': player_id,
+            'bounces': 0
+        }
+        bullets.append(bullet)
+        print(f"Bullet created: {bullet}")
 
 def reflect_bullet(bullet, wall):
     # 计算墙壁的法线向量
@@ -332,11 +348,46 @@ def reflect_bullet(bullet, wall):
     bullet['angle'] = math.atan2(reflected[1], reflected[0])
     
 
+import time
+
+# 全局变量
+crystals = []
+CRYSTAL_SPAWN_INTERVAL = 10  # 10秒
+CRYSTAL_LIFETIME = 5  # 5秒
+LASER_DURATION = 10  # 10秒
+CRYSTAL_RADIUS = 15  # 水晶半径
+TANK_CRYSTAL_MIN_DISTANCE = 100  # 坦克和水晶之间的最小距离
+last_crystal_spawn_time = time.time()
 def update_game():
     if not is_game_running:
         check_game_state()
 
-    global bullets
+    global bullets, crystals, last_crystal_spawn_time, lasers
+    current_time = time.time()
+    
+    # 更新水晶
+    if is_game_running and not crystals and current_time - last_crystal_spawn_time >= CRYSTAL_SPAWN_INTERVAL:
+        spawn_crystal()
+    
+    crystals_to_remove = []
+    for crystal in crystals:
+        if current_time - crystal['spawn_time'] >= CRYSTAL_LIFETIME:
+            # print(f"Crystal at ({crystal['x']}, {crystal['y']}) removed after {current_time - crystal['spawn_time']} seconds")
+            crystals_to_remove.append(crystal)
+    
+    for crystal in crystals_to_remove:
+        crystals.remove(crystal)
+    
+    # 检查玩家是否接触到水晶
+    for player_id, player in players.items():
+        if player['alive']:
+            for crystal in crystals:
+                if math.hypot(player['x'] - crystal['x'], player['y'] - crystal['y']) < TANK_WIDTH/2 + CRYSTAL_RADIUS:
+                    player['laser_end_time'] = current_time + LASER_DURATION
+                    crystals.remove(crystal)
+                    socketio.emit('crystal_collected', {'x': crystal['x'], 'y': crystal['y']}, namespace='/')
+                    break
+
     bullets_to_remove = []
     for bullet in bullets:
         speed = 5
@@ -390,7 +441,25 @@ def update_game():
         if bullet in bullets:
             bullets.remove(bullet)
     
-    # socketio.emit('update_bullets', bullets, namespace='/')
+    # 更新激光
+    lasers_to_remove = []
+    for laser in lasers:
+        if current_time - laser['creation_time'] > 0.1:  # 激光持续时间为0.1秒
+            lasers_to_remove.append(laser)
+        hit_players = process_laser(laser)
+        for player_id in hit_players:
+            if players[player_id]['alive']:
+                players[player_id]['alive'] = False
+                socketio.emit('player_killed', {'id': player_id, 'x': players[player_id]['x'], 'y': players[player_id]['y']}, namespace='/')
+                game_over, winner = check_winner()
+                print('laser hit, winner checked')
+                if game_over:
+                    socketio.emit('game_over', {'winner': winner['name'], 'wins': wins}, namespace='/')
+                    break
+
+    # 移除过期的激光
+    for laser in lasers_to_remove:
+        lasers.remove(laser)
 
 def point_in_rectangle(px, py, rx, ry, rw, rh):
     return rx <= px <= rx + rw and ry <= py <= ry + rh
@@ -413,7 +482,7 @@ def start_game_loop():
         socketio.sleep(1/60)  # 60 FPS 的游戏逻辑
         update_game()
         update_counter += 1
-        if update_counter >= 3:  # 每3帧发送一次更新，相当于20 FPS
+        if update_counter >= 1:  # 每3帧发送一次更新，相当于20 FPS
             update_counter = 0
             send_game_state()
 
@@ -425,9 +494,12 @@ def send_game_state():
             'angle': p['angle'], 
             'alive': p['alive'],
             'color': p['color'],
-            'name': p['name']
+            'name': p['name'],
+            'has_laser': time.time() <= p.get('laser_end_time', 0)
         } for id, p in players.items()},
-        'bullets': [{'x': b['x'], 'y': b['y'], 'angle': b['angle'], 'speed': 5, 'id': id(b)} for b in bullets]
+        'bullets': [{'x': b['x'], 'y': b['y'], 'angle': b['angle'], 'speed': 5, 'id': id(b)} for b in bullets],
+        'crystals': [{'x': c['x'], 'y': c['y'], 'spawn_time': c['spawn_time']} for c in crystals],
+        'lasers': [{'x': l['x'], 'y': l['y'], 'endX': l['endX'], 'endY': l['endY'], 'angle': l['angle']} for l in lasers]
     }
     socketio.emit('game_state', packb(game_state), namespace='/')
 
@@ -457,6 +529,102 @@ def handle_restart_game():
 def default_error_handler(e):
     logger.error(f"An error occurred: {e}")
     logger.exception("Exception details:")
+
+# 添加生成水晶的函数
+def spawn_crystal():
+    global crystals, last_crystal_spawn_time
+    
+    while True:
+        x = random.randint(maze_info['offset_x'], maze_info['offset_x'] + maze_info['width'] - CRYSTAL_RADIUS)
+        y = random.randint(maze_info['offset_y'], maze_info['offset_y'] + maze_info['height'] - CRYSTAL_RADIUS)
+        
+        # 检查是否与墙壁碰撞
+        if any(circle_rectangle_collision(x, y, CRYSTAL_RADIUS, wall) for wall in walls):
+            continue
+        
+        # 检查是否与坦克距离太近
+        if any(math.hypot(player['x'] - x, player['y'] - y) < TANK_CRYSTAL_MIN_DISTANCE for player in players.values()):
+            continue
+        
+        crystal = {
+            'x': x,
+            'y': y,
+            'spawn_time': time.time()
+        }
+        crystals.append(crystal)
+        last_crystal_spawn_time = time.time()
+        # print(f"Crystal spawned at ({x}, {y})")  # 添加日志
+        socketio.emit('crystal_spawned', {'x': x, 'y': y}, namespace='/')
+        break
+
+# 添加处理激光的函数
+def process_laser(laser):
+    hit_players = []
+    current_x, current_y = laser['x'], laser['y']
+    dx = math.cos(laser['angle'])
+    dy = math.sin(laser['angle'])
+    
+    end_x, end_y = current_x, current_y
+    
+    while laser['bounces'] < 3:
+        # 检查激光是否击中玩家
+        for player_id, player in players.items():
+            if player['alive'] and player_id != laser['owner']:
+                if circle_rectangle_collision(current_x, current_y, 1, {
+                    'x': player['x'] - TANK_WIDTH/2,
+                    'y': player['y'] - TANK_HEIGHT/2,
+                    'width': TANK_WIDTH,
+                    'height': TANK_HEIGHT
+                }):
+                    # player['alive'] = False
+                    hit_players.append(player_id)
+        
+        # 检查激光是否击中墙壁
+        wall_hit = False
+        for wall in walls:
+            if circle_rectangle_collision(current_x, current_y, 1, wall):
+                reflect_laser(laser, wall)
+                laser['bounces'] += 1
+                wall_hit = True
+                break
+        
+        if not wall_hit:
+            current_x += dx * 10  # 增加步长以提高性能
+            current_y += dy * 10
+        
+        end_x, end_y = current_x, current_y
+        
+        # 检查是否超出游戏区域
+        if not (0 <= current_x <= GAME_WIDTH and 0 <= current_y <= GAME_HEIGHT):
+            break
+    
+    laser['endX'] = end_x
+    laser['endY'] = end_y
+    
+    return hit_players
+
+def reflect_laser(laser, wall):
+    # 计算墙壁的法线向量
+    if wall['width'] > wall['height']:  # 水平墙
+        normal = (0, 1)
+    else:  # 垂直墙
+        normal = (1, 0)
+    
+    # 计算入射向量
+    incident = (math.cos(laser['angle']), math.sin(laser['angle']))
+    
+    # 计算反射向量
+    dot_product = incident[0]*normal[0] + incident[1]*normal[1]
+    reflected = (
+        incident[0] - 2 * dot_product * normal[0],
+        incident[1] - 2 * dot_product * normal[1]
+    )
+    
+    # 更新激光角度
+    laser['angle'] = math.atan2(reflected[1], reflected[0])
+    
+    # 增加反弹次数
+    laser['bounces'] += 1
 
 if __name__ == '__main__':
     try:

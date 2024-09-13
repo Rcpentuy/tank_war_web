@@ -1,58 +1,74 @@
+// 设置WebSocket协议
 const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
 const host = window.location.hostname;
 const port = window.location.port || (protocol === "wss:" ? "443" : "80");
 
+// 引入msgpack库
 const msgpack = window.msgpack;
 
+// 建立WebSocket连接
 const socket = io(`${protocol}//${host}:${port}`, {
   transports: ["websocket", "polling"],
   reconnectionAttempts: 5,
 });
 
+// 监听连接错误
 socket.on("connect_error", (error) => {
   console.error("连接错误:", error);
 });
+
+// 定义SVG命名空间
 const svgNS = "http://www.w3.org/2000/svg";
 
-// 全局变量
-let gameArea;
-let myId = null;
-let players = {};
-let bullets = [];
-let walls = [];
-let maze_info = {};
-let wins = {};
-let playerLatencies = {};
-let isPlayerListVisible = false;
-let isGameRunning = false;
-const FPS = 30;
-let explosions = [];
-let lastTime = performance.now();
+// 全局变量定义
+let gameArea; // 游戏区域SVG元素
+let myId = null; // 当前玩家ID
+let players = {}; // 所有玩家信息
+let bullets = []; // 子弹信息
+let lasers = []; // 激光信息
+let walls = []; // 墙壁信息
+let maze_info = {}; // 迷宫信息
+let wins = {}; // 胜利次数记录
+let playerLatencies = {}; // 玩家延迟信息
+let isPlayerListVisible = false; // 玩家列表是否可见
+let isGameRunning = false; // 游戏是否正在运行
+const FPS = 30; // 帧率
+let explosions = []; // 爆炸效果数组
+let lastTime = performance.now(); // 上一帧时间
 const explosionDuration = 500; // 爆炸动画持续时间（毫秒）
-let waitingInterval;
-let gameState = "not_joined"; // 可能的状态: 'not_joined', 'waiting', 'playing'
-let isMoving = false;
-let gameOverTimeout = null;
-let targetX = 0;
-let targetY = 0;
+let waitingInterval; // 等待间隔
+let gameState = "not_joined"; // 游戏状态: 'not_joined', 'waiting', 'playing'
+let isMoving = false; // 玩家是否正在移动
+let gameOverTimeout = null; // 游戏结束超时
+let targetX = 0; // 目标X坐标
+let targetY = 0; // 目标Y坐标
 
-//为移动端设备
+// 移动设备相关变量
 let touchStartTime = 0;
 let touchTimeout = null;
 let isTouchMoving = false;
 
+// 游戏状态插值相关变量
 let lastGameState = null;
 let currentGameState = null;
 let interpolationFactor = 0;
 const INTERPOLATION_DURATION = 50; // 插值持续时间（毫秒）
 let lastUpdateTime = 0;
 
+// 游戏结束相关变量
 let gameOverPending = false;
 let pendingWinner = null;
 
+// 射击冷却相关变量
 let lastFireTime = 0;
 const FIRE_COOLDOWN = 300; // 冷却时间，单位为毫秒
 
+// 水晶相关变量
+let crystals = [];
+const CRYSTAL_RADIUS = 15;
+const CRYSTAL_FADE_DURATION = 1000; // 1秒淡出时间
+
+// 测量延迟函数
 function measureLatency() {
   const start = performance.now();
   socket.emit("ping", { clientTime: start }, (serverResponse) => {
@@ -64,12 +80,14 @@ function measureLatency() {
   });
 }
 
+// 处理服务器pong响应
 socket.on("pong", (data) => {
   const end = performance.now();
   const latency = Math.round(end - data.clientTime);
   socket.emit("latency", { latency: latency });
 });
 
+// 记录元素状态的辅助函数
 function logElementState(elementId) {
   const element = document.getElementById(elementId);
   if (element) {
@@ -84,6 +102,7 @@ function logElementState(elementId) {
   }
 }
 
+// 创建SVG元素的辅助函数
 function createSVGElement(type, attributes) {
   const element = document.createElementNS(svgNS, type);
   for (const key in attributes) {
@@ -92,6 +111,7 @@ function createSVGElement(type, attributes) {
   return element;
 }
 
+// 绘制墙壁
 function drawWall(wall) {
   const wallElement = createSVGElement("rect", {
     x: wall.x - maze_info.offset_x,
@@ -103,7 +123,8 @@ function drawWall(wall) {
   gameArea.appendChild(wallElement);
 }
 
-function drawTank(x, y, angle, color, alive, name) {
+// 绘制坦克
+function drawTank(x, y, angle, color, alive, name, hasLaser) {
   const nameBackgroundColor = alive
     ? "rgba(0, 0, 0, 0.5)"
     : "rgba(128, 128, 128, 0.5)";
@@ -150,12 +171,20 @@ function drawTank(x, y, angle, color, alive, name) {
   tankBody.appendChild(rightTrack);
 
   // 坦克炮塔
-  const turret = createSVGElement("circle", {
-    cx: 0,
-    cy: 0,
-    r: tankSize / 3,
-    fill: "#333",
-  });
+  const turret = createSVGElement(
+    hasLaser ? "polygon" : "circle",
+    hasLaser
+      ? {
+          points: calculateHexagonPoints(0, 0, tankSize / 2.5),
+          fill: "purple",
+        }
+      : {
+          cx: 0,
+          cy: 0,
+          r: tankSize / 3,
+          fill: "#333",
+        }
+  );
   tankBody.appendChild(turret);
 
   // 坦克炮管
@@ -163,9 +192,9 @@ function drawTank(x, y, angle, color, alive, name) {
   const barrel = createSVGElement("line", {
     x1: 0,
     y1: 0,
-    x2: barrelLength,
+    x2: hasLaser ? barrelLength / 1.2 : barrelLength,
     y2: 0,
-    stroke: "#333",
+    stroke: hasLaser ? "purple" : "#333",
     "stroke-width": tankSize / 6,
   });
   tankBody.appendChild(barrel);
@@ -207,17 +236,18 @@ function drawTank(x, y, angle, color, alive, name) {
   gameArea.appendChild(tankGroup);
 }
 
-// 修改 drawBullet 函数
+// 绘制子弹
 function drawBullet(x, y) {
   const bullet = createSVGElement("circle", {
     cx: x - maze_info.offset_x,
     cy: y - maze_info.offset_y,
     r: 3,
-    fill: "black", // 黑色
+    fill: "black",
   });
   gameArea.appendChild(bullet);
 }
 
+// 绘制爆炸效果
 function drawExplosion(x, y, frame) {
   const size = 40;
   const maxFrames = 30;
@@ -230,6 +260,7 @@ function drawExplosion(x, y, frame) {
   gameArea.appendChild(explosion);
 }
 
+// 绘制所有游戏元素
 function drawPlayers() {
   if (!gameArea) {
     console.error("gameArea is not initialized");
@@ -245,33 +276,56 @@ function drawPlayers() {
   // 绘制玩家
   for (let id in players) {
     const player = players[id];
-    drawTank(
-      player.x,
-      player.y,
-      player.angle,
-      player.color,
-      player.alive, // 确保这里传递了 alive 状态
-      player.name
-    );
+    if (player) {
+      drawTank(
+        player.x,
+        player.y,
+        player.angle,
+        player.color,
+        player.alive,
+        player.name,
+        player.has_laser
+      );
+    }
   }
 
   // 绘制子弹
   for (let bullet of bullets) {
     drawBullet(bullet.x, bullet.y);
-    // console.log(`Drawing bullet at (${bullet.x}, ${bullet.y})`);
   }
 
-  // 绘制爆炸效果
-  for (let explosion of explosions) {
-    drawExplosion(explosion.x, explosion.y, explosion.frame);
-    explosion.frame++;
-    if (explosion.frame > 30) {
-      explosions.splice(explosions.indexOf(explosion), 1);
+  // 绘制爆炸
+  explosions = explosions.filter((explosion) => {
+    const elapsedTime = performance.now() - explosion.startTime;
+    if (elapsedTime < explosionDuration) {
+      explosion.frame = Math.floor((elapsedTime / explosionDuration) * 30);
+      drawExplosion(explosion.x, explosion.y, explosion.frame);
+      return true;
     }
+    return false;
+  });
+
+  // 绘制水晶
+  crystals = crystals.filter((crystal) => {
+    const elapsedTime = performance.now() - crystal.spawnTime;
+    if (elapsedTime < 5000) {
+      drawCrystal(crystal.x, crystal.y);
+      return true;
+    } else if (elapsedTime < 6000) {
+      const fadeProgress = (elapsedTime - 5000) / 1000;
+      drawCrystal(crystal.x, crystal.y, 1 - fadeProgress);
+      return true;
+    }
+    return false;
+  });
+
+  // 绘制所有激光
+  for (let laser of lasers) {
+    drawLaser(laser.x, laser.y, laser.endX, laser.endY);
   }
 }
 
-// 修改 joinGame 函数
+// 加入游戏
 function joinGame() {
   const nameInput = document.getElementById("playerName");
   if (!nameInput) {
@@ -293,7 +347,7 @@ function joinGame() {
   }
 }
 
-// 添加 resizeCanvas 数
+// 调整画布大小
 function resizeCanvas() {
   if (maze_info && maze_info.width && maze_info.height) {
     const scale = Math.min(
@@ -305,6 +359,7 @@ function resizeCanvas() {
   }
 }
 
+// 页面加载完成后的初始化
 window.onload = function () {
   setInterval(measureLatency, 5000); // 每5秒测量一次延迟
 
@@ -408,7 +463,7 @@ window.onload = function () {
   console.log("Window onload complete");
 };
 
-// 添加新的函数来切换玩家列表的显示
+// 切换玩家列表显示
 function togglePlayerList() {
   isPlayerListVisible = !isPlayerListVisible;
   const playerList = document.getElementById("playerList");
@@ -418,6 +473,7 @@ function togglePlayerList() {
   }
 }
 
+// 更新玩家列表
 function updatePlayerList() {
   const playerList = document.getElementById("playerList");
   let listHtml = "<h3>在线玩家</h3>";
@@ -429,14 +485,14 @@ function updatePlayerList() {
   playerList.innerHTML = listHtml;
 }
 
-// 确保 handleEnterKey 函数被定义
+// 处理回车键
 function handleEnterKey(event) {
   if (event.key === "Enter") {
     joinGame();
   }
 }
 
-// 修改 showJoinForm 函数
+// 显示加入游戏表单
 function showJoinForm() {
   console.log("Showing join form");
   const joinForm = document.getElementById("joinForm");
@@ -703,6 +759,22 @@ function gameLoop(currentTime) {
     return false;
   });
 
+  // 绘制水晶
+  crystals = crystals.filter((crystal) => {
+    const elapsedTime = currentTime - crystal.spawnTime;
+    if (elapsedTime < 5000) {
+      drawCrystal(crystal.x, crystal.y);
+      return true;
+    } else if (elapsedTime < 6000) {
+      const fadeProgress = (elapsedTime - 5000) / 1000;
+      drawCrystal(crystal.x, crystal.y, 1 - fadeProgress);
+      return true;
+    }
+    return false;
+  });
+
+  console.log("Current crystal count:", crystals.length); // 添加日志
+
   // 检查是否所有爆炸动画都已结束，且有待处理的游戏结束事件
   if (gameOverPending && explosions.length === 0) {
     showGameOver(pendingWinner);
@@ -715,46 +787,64 @@ function updateGameState() {
   if (!lastGameState) {
     lastGameState = currentGameState;
   }
-  for (let id in currentGameState.players) {
-    if (!players[id]) {
-      players[id] = currentGameState.players[id];
-    } else {
-      const lastPlayer =
-        lastGameState.players[id] || currentGameState.players[id];
-      const currentPlayer = currentGameState.players[id];
-      players[id].x = lerp(lastPlayer.x, currentPlayer.x, interpolationFactor);
-      players[id].y = lerp(lastPlayer.y, currentPlayer.y, interpolationFactor);
-      players[id].angle = lerpAngle(
-        lastPlayer.angle,
-        currentPlayer.angle,
-        interpolationFactor
-      );
-      players[id].alive = currentPlayer.alive;
-    }
-  }
 
-  bullets = currentGameState.bullets.map((currentBullet) => {
-    const lastBullet = lastGameState.bullets.find(
-      (b) => b.id === currentBullet.id
-    );
-    if (lastBullet) {
-      return {
-        x: lerp(lastBullet.x, currentBullet.x, interpolationFactor),
-        y: lerp(lastBullet.y, currentBullet.y, interpolationFactor),
-        angle: currentBullet.angle,
-        speed: currentBullet.speed,
-        id: currentBullet.id,
-      };
-    } else {
-      return currentBullet;
+  try {
+    for (let id in currentGameState.players) {
+      if (!players[id]) {
+        players[id] = currentGameState.players[id];
+      } else {
+        const lastPlayer =
+          lastGameState.players[id] || currentGameState.players[id];
+        const currentPlayer = currentGameState.players[id];
+        players[id].x = lerp(
+          lastPlayer.x,
+          currentPlayer.x,
+          interpolationFactor
+        );
+        players[id].y = lerp(
+          lastPlayer.y,
+          currentPlayer.y,
+          interpolationFactor
+        );
+        players[id].angle = lerpAngle(
+          lastPlayer.angle,
+          currentPlayer.angle,
+          interpolationFactor
+        );
+        players[id].alive = currentPlayer.alive;
+        players[id].has_laser = currentPlayer.has_laser;
+      }
     }
-  });
-  // 删除不再存在的玩家
-  for (let id in players) {
-    if (!currentGameState.players[id]) {
-      delete players[id];
-      console.log(`玩家 ${id} 已从游戏中移除`);
+
+    bullets = currentGameState.bullets.map((currentBullet) => {
+      const lastBullet = lastGameState.bullets.find(
+        (b) => b.id === currentBullet.id
+      );
+      if (lastBullet) {
+        return {
+          x: lerp(lastBullet.x, currentBullet.x, interpolationFactor),
+          y: lerp(lastBullet.y, currentBullet.y, interpolationFactor),
+          angle: currentBullet.angle,
+          speed: currentBullet.speed,
+          id: currentBullet.id,
+        };
+      } else {
+        return currentBullet;
+      }
+    });
+
+    // 更新水晶
+    // crystals = currentGameState.crystals;
+
+    // 删除不再存在的玩家
+    for (let id in players) {
+      if (!currentGameState.players[id]) {
+        delete players[id];
+        console.log(`玩家 ${id} 已从游戏中移除`);
+      }
     }
+  } catch (error) {
+    console.error("Error updating game state:", error);
   }
 }
 
@@ -767,6 +857,121 @@ function lerpAngle(start, end, factor) {
   const shortestAngle = ((diff + Math.PI) % (Math.PI * 2)) - Math.PI;
   return start + shortestAngle * factor;
 }
+
+// 添加绘制水晶的函数
+function drawCrystal(x, y, opacity = 1) {
+  const crystal = createSVGElement("polygon", {
+    points: calculateHexagonPoints(
+      x - maze_info.offset_x,
+      y - maze_info.offset_y,
+      CRYSTAL_RADIUS
+    ),
+    fill: `rgba(128, 0, 128, ${opacity})`,
+  });
+  gameArea.appendChild(crystal);
+}
+
+// 添加计算六边形顶点的函数
+function calculateHexagonPoints(centerX, centerY, radius) {
+  let points = [];
+  for (let i = 0; i < 6; i++) {
+    const angle = (i * Math.PI) / 3;
+    const x = centerX + radius * Math.cos(angle);
+    const y = centerY + radius * Math.sin(angle);
+    points.push(`${x},${y}`);
+  }
+  return points.join(" ");
+}
+
+// 添加处理激光的函数
+function drawLaser(startX, startY, endX, endY) {
+  if (
+    typeof startX !== "number" ||
+    typeof startY !== "number" ||
+    typeof endX !== "number" ||
+    typeof endY !== "number"
+  ) {
+    console.error("Invalid laser coordinates:", { startX, startY, endX, endY });
+    return;
+  }
+
+  console.log("Drawing laser with coordinates:", {
+    startX,
+    startY,
+    endX,
+    endY,
+  }); // 添加这行日志
+
+  // 检查 gameArea 是否存在
+  if (!gameArea) {
+    console.error("gameArea is not defined");
+    return;
+  }
+
+  const laser = createSVGElement("line", {
+    x1: startX - maze_info.offset_x,
+    y1: startY - maze_info.offset_y,
+    x2: endX - maze_info.offset_x,
+    y2: endY - maze_info.offset_y,
+    stroke: "purple",
+    "stroke-width": "3",
+  });
+  // 添加激光到 gameArea
+  gameArea.appendChild(laser);
+  console.log("Laser element added to gameArea:", laser);
+}
+
+// 修改 game_state 事件处理
+socket.on("game_state", (binaryData) => {
+  try {
+    const decodedData = msgpack.decode(new Uint8Array(binaryData));
+    lastGameState = currentGameState;
+    currentGameState = decodedData;
+    lastUpdateTime = performance.now();
+    interpolationFactor = 0;
+
+    // 更新本地游戏状态
+    players = currentGameState.players;
+    bullets = currentGameState.bullets;
+    lasers = currentGameState.lasers;
+    // 更新水晶，但不覆盖现有的水晶
+    currentGameState.crystals.forEach((serverCrystal) => {
+      if (
+        !crystals.some(
+          (c) => c.x === serverCrystal.x && c.y === serverCrystal.y
+        )
+      ) {
+        crystals.push({
+          x: serverCrystal.x,
+          y: serverCrystal.y,
+          spawnTime: serverCrystal.spawn_time * 1000, // 转换为毫秒
+        });
+      }
+    });
+  } catch (error) {
+    console.error("Error decoding game state:", error);
+  }
+});
+
+// 添加新的 socket 事件监听器
+socket.on("crystal_spawned", (data) => {
+  console.log("Crystal spawned:", data);
+  const newCrystal = {
+    x: data.x,
+    y: data.y,
+    spawnTime: performance.now(),
+  };
+  crystals.push(newCrystal);
+  console.log("Crystals after spawn:", crystals);
+});
+
+socket.on("crystal_collected", (data) => {
+  console.log("Crystal collected:", data);
+  crystals = crystals.filter(
+    (crystal) => crystal.x !== data.x || crystal.y !== data.y
+  );
+  console.log("Crystals after collection:", crystals);
+});
 
 // 修改 handleMouseMove 函数
 function handleMouseMove(event) {
@@ -928,11 +1133,6 @@ socket.on("game_state", (binaryData) => {
   interpolationFactor = 0;
 });
 
-// socket.on("update_bullets", (updatedBullets) => {
-//   bullets = updatedBullets;
-//   drawPlayers(); // 立即重新绘制
-// });
-
 socket.on("player_killed", (data) => {
   console.log("Player killed:", data);
   if (players[data.id]) {
@@ -947,7 +1147,6 @@ socket.on("player_killed", (data) => {
   drawPlayers(); // 重新绘制以更新玩家状态
 });
 
-// 修改 addExplosion 函数
 function addExplosion(x, y) {
   explosions.push({ x: x, y: y, frame: 0, startTime: performance.now() });
 }
