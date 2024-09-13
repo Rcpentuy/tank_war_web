@@ -162,34 +162,6 @@ def circle_rectangle_collision(circle_x, circle_y, circle_radius, rect):
     
     return distance_squared <= circle_radius**2
 
-@socketio.on('ping')
-def handle_ping(data):
-    try:
-        client_time = data['clientTime']
-        server_time = int(time.time() * 1000)  # 转换为毫秒
-        emit('pong', {'clientTime': client_time, 'serverTime': server_time})
-    except Exception as e:
-        print(f"Error handling ping: {e}")
-        emit('pong', {'error': 'Internal server error'})
-
-@socketio.on('latency')
-def handle_latency(data):
-    player_id = request.sid
-    player_latencies[player_id] = data['latency']
-    emit('update_latencies', player_latencies, broadcast=True)
-
-def check_game_state():
-    global is_game_running
-    if len(players) == 1:
-        socketio.emit('waiting_for_players', {'count': len(players)}, namespace='/')
-    elif len(players) > 1: 
-        socketio.emit('game_start', namespace='/')
-        is_game_running = True
-    else:
-        # 如果没有玩家，重置游戏状态
-        is_game_running = False
-        reset_game()
-
 @socketio.on('player_join')
 def handle_player_join(data):    
     player_id = request.sid
@@ -222,6 +194,36 @@ def handle_player_join(data):
     
     emit('update_player_count', {'count': len(players), 'players': [p['name'] for p in players.values()]}, broadcast=True)
     check_game_state()  # 检查游戏状态
+
+
+
+@socketio.on('ping')
+def handle_ping(data):
+    try:
+        client_time = data['clientTime']
+        server_time = int(time.time() * 1000)  # 转换为毫秒
+        emit('pong', {'clientTime': client_time, 'serverTime': server_time})
+    except Exception as e:
+        print(f"Error handling ping: {e}")
+        emit('pong', {'error': 'Internal server error'})
+
+@socketio.on('latency')
+def handle_latency(data):
+    player_id = request.sid
+    player_latencies[player_id] = data['latency']
+    emit('update_latencies', player_latencies, broadcast=True)
+
+def check_game_state():
+    global is_game_running
+    if len(players) == 1:
+        socketio.emit('waiting_for_players', {'count': len(players)}, namespace='/')
+    elif len(players) > 1: 
+        socketio.emit('game_start', namespace='/')
+        is_game_running = True
+    else:
+        # 如果没有玩家，重置游戏状态
+        is_game_running = False
+        reset_game()
 
 
 
@@ -476,15 +478,6 @@ def check_winner():
         return False, None
     return False, None
 
-def start_game_loop():
-    update_counter = 0
-    while True:
-        socketio.sleep(1/60)  # 60 FPS 的游戏逻辑
-        update_game()
-        update_counter += 1
-        if update_counter >= 1:  # 每3帧发送一次更新，相当于20 FPS
-            update_counter = 0
-            send_game_state()
 
 def send_game_state():
     game_state = {
@@ -502,6 +495,17 @@ def send_game_state():
         'lasers': [{'x': l['x'], 'y': l['y'], 'endX': l['endX'], 'endY': l['endY'], 'angle': l['angle']} for l in lasers]
     }
     socketio.emit('game_state', packb(game_state), namespace='/')
+
+def start_game_loop():
+    update_counter = 0
+    while True:
+        socketio.sleep(1/60)  # 60 FPS 的游戏逻辑
+        update_game()
+        update_counter += 1
+        if update_counter >= 3:  # 每3帧发送一次更新，相当于20 FPS
+            update_counter = 0
+            print('sent game_state')
+            send_game_state()
 
 def run_game_loop():
     try:
