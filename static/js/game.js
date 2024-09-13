@@ -323,10 +323,7 @@ function drawPlayers() {
     return false;
   });
 
-  // 绘制所有激光
-  for (let laser of lasers) {
-    drawLaser(laser.x, laser.y, laser.endX, laser.endY);
-  }
+  drawLaser();
 }
 
 // 加入游戏
@@ -904,26 +901,46 @@ function calculateHexagonPoints(centerX, centerY, radius) {
   return points.join(" ");
 }
 
-// 添加处理激光的函数
-function drawLaser(startX, startY, endX, endY) {
-  console.log("Drawing laser with coordinates:", {
-    startX,
-    startY,
-    endX,
-    endY,
-  }); // 添加这行日志
+function drawLaser() {
+  // 首先，移除所有现有的激光元素
+  // const existingLasers = gameArea.querySelectorAll(".laser");
+  // existingLasers.forEach((laser) => laser.remove());
 
-  const laser = createSVGElement("line", {
-    x1: startX - maze_info.offset_x,
-    y1: startY - maze_info.offset_y,
-    x2: endX - maze_info.offset_x,
-    y2: endY - maze_info.offset_y,
-    stroke: "purple",
-    "stroke-width": "3",
+  lasers.forEach((laser) => {
+    const laserGroup = createSVGElement("g", { class: "laser" });
+
+    // 创建激光路径
+    const pathData =
+      `M${laser.x - maze_info.offset_x},${laser.y - maze_info.offset_y} ` +
+      laser.reflected_points
+        .map(
+          (point) =>
+            `L${point[0] - maze_info.offset_x},${point[1] - maze_info.offset_y}`
+        )
+        .join(" ");
+
+    const laserPath = createSVGElement("path", {
+      d: pathData,
+      stroke: "lightskyblue",
+      "stroke-width": "2",
+      fill: "none",
+    });
+
+    laserGroup.appendChild(laserPath);
+
+    // 在每个反射点绘制一个小圆
+    laser.reflected_points.forEach((point) => {
+      const reflectionPoint = createSVGElement("circle", {
+        cx: point[0] - maze_info.offset_x,
+        cy: point[1] - maze_info.offset_y,
+        r: "3",
+        fill: "white",
+      });
+      laserGroup.appendChild(reflectionPoint);
+    });
+
+    gameArea.appendChild(laserGroup);
   });
-  // 添加激光到 gameArea
-  gameArea.appendChild(laser);
-  console.log("Laser element added to gameArea:", laser);
 }
 
 // 添加新的 socket 事件监听器

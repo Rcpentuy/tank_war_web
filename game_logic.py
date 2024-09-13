@@ -3,7 +3,7 @@ from app import socketio
 import math
 import random
 import time
-from utils import circle_rectangle_collision, generate_maze
+from utils import circle_rectangle_collision, generate_maze,line_rectangle_intersection,line_rectangle_collision
 from msgpack import packb
 from threading import Thread
 
@@ -118,7 +118,7 @@ def send_game_state():
         } for id, p in players.items()},
         'bullets': [{'x': b['x'], 'y': b['y'], 'angle': b['angle'], 'speed': 5, 'id': id(b)} for b in bullets],
         'crystals': [{'x': c['x'], 'y': c['y'], 'spawn_time': c['spawn_time']} for c in crystals],
-        'lasers': [{'x': l['x'], 'y': l['y'], 'endX': l['endX'], 'endY': l['endY'], 'angle': l['angle']} for l in lasers],
+        'lasers': [{'x': l['x'], 'y': l['y'], 'angle': l['angle'],'reflected_points':l['reflected_points']} for l in lasers],
     }
     socketio.emit('game_state', packb(game_state), namespace='/')
 
@@ -138,65 +138,6 @@ def run_game_loop():
     except Exception as e:
         logger.error(f"Error starting game loop: {e}")
         logger.exception("Exception details:")
-
-def handle_player_move(data):
-    player_id = data['player_id']
-    player = players[player_id]
-    if not player['alive']:
-        return
-
-    speed = 1.5
-    player['angle'] = data['angle']
-    player['moving'] = data['moving']
-
-    if player['moving']:
-        dx = math.cos(player['angle']) * speed
-        dy = math.sin(player['angle']) * speed
-        new_x = player['x'] + dx
-        new_y = player['y'] + dy
-        
-        # 碰撞检测
-        tank_radius = max(TANK_WIDTH, TANK_HEIGHT) / 2 + 2
-        
-        if not any(circle_rectangle_collision(new_x, new_y, tank_radius, wall) for wall in walls):
-            player['x'] = new_x
-            player['y'] = new_y
-
-def handle_fire(player_id):
-    if player_id not in players or not players[player_id]['alive']:
-        return
-    
-    player = players[player_id]
-    current_time = time.time()
-    
-    # 坦克中心到炮口的距离
-    barrel_length = max(TANK_WIDTH, TANK_HEIGHT) / 2 + 5  # 确保子弹在坦克外部生成
-    
-    # 计算炮口位置
-    fire_start_x = player['x'] + math.cos(player['angle']) * barrel_length
-    fire_start_y = player['y'] + math.sin(player['angle']) * barrel_length
-    
-    if current_time <= player.get('laser_end_time', 0):
-        # 发射激光
-        laser = {
-            'x': fire_start_x,
-            'y': fire_start_y,
-            'angle': player['angle'],
-            'owner': player_id,
-            'bounces': 0,
-            'creation_time': current_time
-        }
-        lasers.append(laser)
-    else:
-        # 发射普通子弹
-        bullet = {
-            'x': fire_start_x,
-            'y': fire_start_y,
-            'angle': player['angle'],
-            'owner': player_id,
-            'bounces': 0
-        }
-        bullets.append(bullet)
 
 def check_game_state():
     global is_game_running
@@ -352,17 +293,12 @@ def spawn_crystal():
 
 def process_laser(laser):
     hit_players = []
-    current_x, current_y = laser['x'], laser['y']
-    dx = math.cos(laser['angle'])
-    dy = math.sin(laser['angle'])
-    
-    end_x, end_y = current_x, current_y
-    
-    while laser['bounces'] < 3:
-        # 检查激光是否击中玩家
+    start_x, start_y = laser['x'], laser['y']
+    for end_x, end_y in laser['reflected_points']:
+        # 检查这条线段上是否有玩家被击中
         for player_id, player in players.items():
             if player['alive'] and player_id != laser['owner']:
-                if circle_rectangle_collision(current_x, current_y, 1, {
+                if line_rectangle_collision(start_x, start_y, end_x, end_y, {
                     'x': player['x'] - TANK_WIDTH/2,
                     'y': player['y'] - TANK_HEIGHT/2,
                     'width': TANK_WIDTH,
@@ -370,47 +306,71 @@ def process_laser(laser):
                 }):
                     hit_players.append(player_id)
         
-        # 检查激光是否击中墙壁
-        wall_hit = False
-        for wall in walls:
-            if circle_rectangle_collision(current_x, current_y, 1, wall):
-                reflect_laser(laser, wall)
-                laser['bounces'] += 1
-                wall_hit = True
-                break
-        
-        if not wall_hit:
-            current_x += dx * 10  # 增加步长以提高性能
-            current_y += dy * 10
-        
-        end_x, end_y = current_x, current_y
-        
-        # 检查是否超出游戏区域
-        if not (0 <= current_x <= GAME_WIDTH and 0 <= current_y <= GAME_HEIGHT):
-            break
-    
-    laser['endX'] = end_x
-    laser['endY'] = end_y
+        start_x, start_y = end_x, end_y
     
     return hit_players
 
-def reflect_laser(laser, wall):
-    # 计算墙壁的法线向量
-    if wall['width'] > wall['height']:  # 水平墙
-        normal = (0, 1)
-    else:  # 垂直墙
-        normal = (1, 0)
+def reflect_laser(laser, walls):
+    reflected_points = []
+    current_x, current_y = laser['x'], laser['y']
+    angle = laser['angle']
     
-    # 计算入射向量
-    incident = (math.cos(laser['angle']), math.sin(laser['angle']))
+    print(f"Initial laser position: ({current_x}, {current_y}), angle: {angle}")
     
-    # 计算反射向量
-    dot_product = incident[0]*normal[0] + incident[1]*normal[1]
-    reflected = (
-        incident[0] - 2 * dot_product * normal[0],
-        incident[1] - 2 * dot_product * normal[1]
-    )
+    for i in range(REFLECTION_TIMES):
+        dx = math.cos(angle)
+        dy = math.sin(angle)
+        
+        print(f"Reflection {i+1}: direction vector: ({dx}, {dy})")
+        
+        min_distance = float('inf')
+        collision_point = None
+        collision_wall = None
+        
+        # 检查与所有墙壁的交点
+        for wall in walls:
+            intersection = line_rectangle_intersection(current_x, current_y, dx, dy, wall)
+            if intersection:
+                distance = math.hypot(intersection[0] - current_x, intersection[1] - current_y)
+                if distance < min_distance:
+                    min_distance = distance
+                    collision_point = intersection
+                    collision_wall = wall
+                print(f"  Intersection with wall {wall}: {intersection}")
+        
+        # 如果没有找到交点，检查与游戏边界的交点
+        if not collision_point:
+            game_bounds = [
+                {'x': 0, 'y': 0, 'width': GAME_WIDTH, 'height': WALL_THICKNESS},  # 上边界
+                {'x': 0, 'y': GAME_HEIGHT - WALL_THICKNESS, 'width': GAME_WIDTH, 'height': WALL_THICKNESS},  # 下边界
+                {'x': 0, 'y': 0, 'width': WALL_THICKNESS, 'height': GAME_HEIGHT},  # 左边界
+                {'x': GAME_WIDTH - WALL_THICKNESS, 'y': 0, 'width': WALL_THICKNESS, 'height': GAME_HEIGHT}  # 右边界
+            ]
+            for bound in game_bounds:
+                intersection = line_rectangle_intersection(current_x, current_y, dx, dy, bound)
+                if intersection:
+                    distance = math.hypot(intersection[0] - current_x, intersection[1] - current_y)
+                    if distance < min_distance:
+                        min_distance = distance
+                        collision_point = intersection
+                        collision_wall = bound
+                    print(f"  Intersection with game boundary {bound}: {intersection}")
+        
+        if collision_point:
+            reflected_points.append(collision_point)
+            current_x, current_y = collision_point
+            
+            # 计算反射角度
+            if collision_wall['width'] > collision_wall['height']:  # 水平墙
+                angle = 2 * math.pi - angle
+            else:  # 垂直墙
+                angle = math.pi - angle
+            
+            print(f"  Collision at {collision_point}, new angle: {angle}")
+        else:
+            print("  No collision found, this should not happen!")
+            break
     
-    # 更新激光角度
-    laser['angle'] = math.atan2(reflected[1], reflected[0])
+    laser['reflected_points'] = reflected_points
+    return laser
 

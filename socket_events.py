@@ -2,7 +2,7 @@ from app import socketio
 from flask import request
 from flask_socketio import emit
 from game_state import players, bullets, walls, maze_info, wins, player_latencies, player_colors, TANK_WIDTH, TANK_HEIGHT
-from game_logic import respawn_player, check_game_state, reset_game, handle_player_move, handle_fire
+from game_logic import respawn_player, check_game_state, reset_game, reflect_laser
 from utils import circle_rectangle_collision
 from game_logic import lasers, generate_walls
 import random
@@ -126,14 +126,13 @@ def handle_fire():
             'y': fire_start_y,
             'angle': player['angle'],
             'owner': player_id,
-            'bounces': 0,
             'creation_time': current_time
         }
+        laser = reflect_laser(laser,walls)
+        print('反射之后：',laser)
         lasers.append(laser)
     else:
         # 发射普通子弹
-        print(f"Player {player_id} fired a bullet")
-        
         bullet = {
             'x': fire_start_x,
             'y': fire_start_y,
@@ -142,7 +141,6 @@ def handle_fire():
             'bounces': 0
         }
         bullets.append(bullet)
-        print(f"Bullet created: {bullet}")
 
 @socketio.on('ping')
 def handle_ping(data):

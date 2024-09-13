@@ -1,4 +1,3 @@
-# from server import app, socketio, generate_walls, run_game_loop
 from app import app,socketio
 from game_logic import generate_walls,run_game_loop
 

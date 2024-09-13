@@ -26,6 +26,7 @@ CRYSTAL_LIFETIME = 5  # 5秒
 LASER_DURATION = 10  # 10秒
 CRYSTAL_RADIUS = 15  # 水晶半径
 TANK_CRYSTAL_MIN_DISTANCE = 100  # 坦克和水晶之间的最小距离
+REFLECTION_TIMES = 3 #激光反弹次数
 
 # 初始化最后一次水晶生成时间
 import time
@@ -37,7 +38,6 @@ BULLET_SPEED = 5
 TANK_SPEED = 1.5
 MAX_BULLET_BOUNCES = 10
 LASER_DURATION = 10  # 激光武器持续时间为10秒
-MAX_LASER_BOUNCES = 3
 
 # 游戏更新频率
 GAME_UPDATE_RATE = 60  # 60 FPS
