@@ -1008,15 +1008,15 @@ function handleMouseMove(event) {
   );
 }
 
-// 修改 handleMouseDown 函数
+// 处理鼠标按下事件
 function handleMouseDown(event) {
   event.preventDefault();
   if (event.button === 0) {
-    // 左键
+    // 左键按下
     isMoving = true;
     handleMouseMove(event); // 立即更新目标位置
   } else if (event.button === 2) {
-    // 右键
+    // 右键按下
     const currentTime = performance.now();
     if (currentTime - lastFireTime >= FIRE_COOLDOWN) {
       console.log("Attempting to fire");
@@ -1028,7 +1028,7 @@ function handleMouseDown(event) {
   }
 }
 
-// 添加以下函数来处理触摸事件
+// 处理触摸开始事件
 function handleTouchStart(event) {
   event.preventDefault();
   const touch = event.touches[0];
@@ -1041,6 +1041,7 @@ function handleTouchStart(event) {
   }, 300);
 }
 
+// 处理触摸移动事件
 function handleTouchMove(event) {
   event.preventDefault();
   if (isTouchMoving) {
@@ -1049,11 +1050,13 @@ function handleTouchMove(event) {
   }
 }
 
+// 处理触摸结束事件
 function handleTouchEnd(event) {
   event.preventDefault();
   clearTimeout(touchTimeout);
 
   if (isTouchMoving) {
+    // 如果是移动状态，停止移动
     isTouchMoving = false;
     isMoving = false;
     const currentAngle = players[myId] ? players[myId].angle : 0;
@@ -1071,6 +1074,7 @@ function handleTouchEnd(event) {
   }
 }
 
+// 更新触摸位置
 function updateTouchPosition(touch) {
   const rect = gameArea.getBoundingClientRect();
   const scaleX = gameArea.width.baseVal.value / rect.width;
@@ -1107,8 +1111,9 @@ function updateTouchPosition(touch) {
   }
 }
 
-// 确保这个事件监听器被正确添加
+// 添加鼠标按下事件监听器
 document.addEventListener("mousedown", handleMouseDown);
+// 阻止右键菜单弹出
 document.addEventListener(
   "contextmenu",
   function (e) {
@@ -1117,15 +1122,16 @@ document.addEventListener(
   false
 );
 
-// 修改 handleMouseUp 函数
+// 处理鼠标松开事件
 function handleMouseUp(event) {
   event.preventDefault();
   if (event.button === 0) {
-    // 左键
+    // 左键松开
     isMoving = false;
   }
 }
 
+// 处理游戏状态更新
 socket.on("game_state", (binaryData) => {
   lastGameState = currentGameState;
   currentGameState = msgpack.decode(new Uint8Array(binaryData));
@@ -1133,6 +1139,7 @@ socket.on("game_state", (binaryData) => {
   interpolationFactor = 0;
 });
 
+// 处理玩家被击杀事件
 socket.on("player_killed", (data) => {
   console.log("Player killed:", data);
   if (players[data.id]) {
@@ -1147,10 +1154,12 @@ socket.on("player_killed", (data) => {
   drawPlayers(); // 重新绘制以更新玩家状态
 });
 
+// 添加爆炸效果
 function addExplosion(x, y) {
   explosions.push({ x: x, y: y, frame: 0, startTime: performance.now() });
 }
 
+// 处理玩家更新事件
 socket.on("player_updated", (binaryData) => {
   try {
     // 解码二进制数据
@@ -1166,6 +1175,7 @@ socket.on("player_updated", (binaryData) => {
   }
 });
 
+// 显示游戏结束界面
 function showGameOver(winner) {
   const gameOverModal = document.getElementById("gameOverModal");
   const winnerNameElement = document.getElementById("winnerName");
@@ -1181,7 +1191,7 @@ function showGameOver(winner) {
   isGameRunning = false;
 }
 
-// 添加这个函数
+// 显示更改名字表单
 function showChangeNameForm() {
   console.log("Showing change name form");
   document.getElementById("gameInfo").style.display = "none";
@@ -1190,7 +1200,7 @@ function showChangeNameForm() {
   document.getElementById("newPlayerName").focus();
 }
 
-// 添加这个函数
+// 提交新名字
 function submitNewName() {
   const newName = document.getElementById("newPlayerName").value.trim();
   if (newName) {
@@ -1205,14 +1215,14 @@ function submitNewName() {
   }
 }
 
-// 添加这个函数
+// 取消更改名字
 function cancelChangeName() {
   console.log("Cancelling name change");
   document.getElementById("changeNameForm").style.display = "none";
   document.getElementById("gameInfo").style.display = "flex";
 }
 
-// 添加这个事件监听器
+// 处理名字更改事件
 socket.on("name_changed", (data) => {
   console.log("Name changed:", data);
   if (data.id === myId) {
@@ -1223,6 +1233,7 @@ socket.on("name_changed", (data) => {
   updateScoreBoard();
 });
 
+// 检查设备方向
 function checkOrientation() {
   if (window.screen.orientation.type.includes("portrait")) {
     // 竖屏
@@ -1233,9 +1244,11 @@ function checkOrientation() {
   }
 }
 
+// 添加页面加载和方向变化事件监听器
 window.addEventListener("load", checkOrientation);
-window.screen.orientation.addEventListener("change", checkOrientation);
+window.addEventListener("orientationchange", checkOrientation);
 
+// 页面卸载前断开socket连接
 window.addEventListener("beforeunload", () => {
   socket.disconnect();
 });
