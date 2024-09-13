@@ -709,6 +709,7 @@ function showWaitingScreen() {
 
 // 修改 game_state 事件处理
 socket.on("game_state", (binaryData) => {
+  console.log("game_state received");
   try {
     const decodedData = msgpack.decode(new Uint8Array(binaryData));
     lastGameState = currentGameState;

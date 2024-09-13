@@ -1,2 +1,5 @@
 .venv/*
 .DS_Store
+prompt.md
+integrity_checker.py
+differences.diff
