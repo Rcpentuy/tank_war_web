@@ -36,6 +36,7 @@ last_crystal_spawn_time = time.time()
 # 游戏设置
 BULLET_SPEED = 5
 TANK_SPEED = 1.5
+ROTATING_SPEED = 0.05  # 每帧旋转的弧度
 MAX_BULLET_BOUNCES = 10
 LASER_DURATION = 10  # 激光武器持续时间为10秒
 

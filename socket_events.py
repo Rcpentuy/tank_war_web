@@ -26,7 +26,9 @@ def handle_player_join(data):
             'turret_angle': 0,
             'color': player_colors[player_id],
             'alive': True,
-            'name': data['name']
+            'name': data['name'],
+            'moving':0,
+            'rotating':0,
         }
         if player_id not in wins:
             wins[player_id] = 0  # 初始化玩家胜利次数
@@ -81,23 +83,12 @@ def handle_player_move(data):
     player = players[player_id]
     if not player['alive']:
         return
-
-    speed = TANK_SPEED
-    player['angle'] = data['angle']
-    player['moving'] = data['moving']
-
-    if player['moving']:
-        dx = math.cos(player['angle']) * speed
-        dy = math.sin(player['angle']) * speed
-        new_x = player['x'] + dx
-        new_y = player['y'] + dy
-        
-        # 碰撞检测
-        tank_radius = max(TANK_WIDTH, TANK_HEIGHT) / 2 + 2
-        
-        if not any(circle_rectangle_collision(new_x, new_y, tank_radius, wall) for wall in walls):
-            player['x'] = new_x
-            player['y'] = new_y
+    if 'angle' in data:
+        player['angle'] = data['angle']
+    if 'moving' in data:
+        player['moving'] = data['moving']
+    if 'rotating' in data:
+        player['rotating'] = data['rotating']
     
         
         # 所有数据由send_game_state统一发送，这里不需要打包或者发送数据
@@ -112,7 +103,7 @@ def handle_fire():
     current_time = time.time()
     
     # 坦克中心到炮口的距离
-    barrel_length = max(TANK_WIDTH, TANK_HEIGHT) / 2 + 5  # 确保子弹在坦克外部生成
+    barrel_length = max(TANK_WIDTH, TANK_HEIGHT) / 2 + 3  # 确保子弹在坦克外部生成
     
     # 计算炮口位置
     fire_start_x = player['x'] + math.cos(player['angle']) * barrel_length

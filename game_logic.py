@@ -14,6 +14,27 @@ def update_game():
 
     current_time = time.time()
     
+    # 更新玩家位置和角度
+    for player_id, player in players.items():
+        if player['alive']:
+            # 更新位置
+            speed = TANK_SPEED * player['moving']
+            new_x = player['x'] + math.cos(player['angle']) * speed
+            new_y = player['y'] + math.sin(player['angle']) * speed
+            
+            # 更新角度
+            new_angle = player['angle'] + ROTATING_SPEED * player['rotating']
+            
+            # 确保角度在 0 到 2π 之间
+            new_angle %= 2 * math.pi
+            # 碰撞检测
+            tank_radius = max(TANK_WIDTH, TANK_HEIGHT) / 2 + 2
+            
+            if not any(circle_rectangle_collision(new_x, new_y, tank_radius, wall) for wall in walls):
+                player['x'] = new_x
+                player['y'] = new_y
+                player['angle'] = new_angle
+
     # 更新水晶
     if is_game_running and not crystals and current_time - last_crystal_spawn_time >= CRYSTAL_SPAWN_INTERVAL:
         spawn_crystal()

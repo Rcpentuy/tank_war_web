@@ -710,7 +710,6 @@ function showWaitingScreen() {
 
 // 修改 game_state 事件处理
 socket.on("game_state", (binaryData) => {
-  // console.log("game_state received");
   try {
     const decodedData = msgpack.decode(new Uint8Array(binaryData));
     lastGameState = currentGameState;
@@ -718,9 +717,6 @@ socket.on("game_state", (binaryData) => {
     lastUpdateTime = performance.now();
     interpolationFactor = 0;
 
-    // 更新本地游戏状态
-    // players = currentGameState.players;
-    // bullets = currentGameState.bullets;
     lasers = currentGameState.lasers;
     // 移除不再存在的水晶
     crystals = crystals.filter((crystal) =>
@@ -729,22 +725,6 @@ socket.on("game_state", (binaryData) => {
           serverCrystal.x === crystal.x && serverCrystal.y === crystal.y
       )
     );
-    // 更新水晶，但不覆盖现有的水晶
-    // currentGameState.crystals.forEach((serverCrystal) => {
-    //   if (
-    //     // 检查当前水晶是否已存在于本地水晶数组中
-    //     // 如果不存在（返回 false），则添加新的水晶
-    //     !crystals.some(
-    //       (c) => c.x === serverCrystal.x && c.y === serverCrystal.y
-    //     )
-    //   ) {
-    //     crystals.push({
-    //       x: serverCrystal.x,
-    //       y: serverCrystal.y,
-    //       spawnTime: serverCrystal.spawn_time * 1000, // 转换为毫秒
-    //     });
-    //   }
-    // });
   } catch (error) {
     console.error("Error decoding game state:", error);
   }
@@ -767,11 +747,15 @@ function gameLoop(currentTime) {
     updateGameState();
   }
 
+  // 检查玩家是否正在移动（通过鼠标或触摸）且玩家存在
   if ((isMoving || isTouchMoving) && players[myId]) {
     const player = players[myId];
+    // 计算玩家当前位置到目标位置的水平和垂直距离
     const dx = targetX - player.x;
     const dy = targetY - player.y;
+    // 计算玩家到目标位置的直线距离
     const distanceToTarget = Math.sqrt(dx * dx + dy * dy);
+    // 计算玩家到目标位置的角度
     const angle = Math.atan2(dy, dx);
 
     if (distanceToTarget > 5) {
@@ -785,14 +769,7 @@ function gameLoop(currentTime) {
     }
   }
 
-  //   // 非插值法更新子弹位置
-  //   bullets.forEach((bullet) => {
-  //     bullet.x += Math.cos(bullet.angle) * bullet.speed * (1 / 60); // 假设 60 FPS
-  //     bullet.y += Math.sin(bullet.angle) * bullet.speed * (1 / 60);
-  //   });
   drawPlayers();
-
-  // console.log("Current crystal count:", crystals.length); // 添加日志
 
   // 检查是否所有爆炸动画都已结束，且有待处理的游戏结束事件
   if (gameOverPending && explosions.length === 0) {
@@ -808,29 +785,43 @@ function updateGameState() {
   }
 
   try {
+    // 遍历当前游戏状态中的所有玩家
     for (let id in currentGameState.players) {
+      // 如果本地玩家对象中不存在该玩家，直接添加
       if (!players[id]) {
         players[id] = currentGameState.players[id];
       } else {
+        // 获取上一帧的玩家状态，如果不存在则使用当前状态
         const lastPlayer =
           lastGameState.players[id] || currentGameState.players[id];
+        // 获取当前帧的玩家状态
         const currentPlayer = currentGameState.players[id];
+
+        // 使用线性插值计算玩家的 X 坐标
         players[id].x = lerp(
           lastPlayer.x,
           currentPlayer.x,
           interpolationFactor
         );
+
+        // 使用线性插值计算玩家的 Y 坐标
         players[id].y = lerp(
           lastPlayer.y,
           currentPlayer.y,
           interpolationFactor
         );
+
+        // 使用角度插值计算玩家的旋转角度
         players[id].angle = lerpAngle(
           lastPlayer.angle,
           currentPlayer.angle,
           interpolationFactor
         );
+
+        // 更新玩家的存活状态
         players[id].alive = currentPlayer.alive;
+
+        // 更新玩家是否拥有激光武器
         players[id].has_laser = currentPlayer.has_laser;
       }
     }
@@ -1018,6 +1009,17 @@ function handleMouseDown(event) {
   }
 }
 
+// 处理鼠标松开事件
+function handleMouseUp(event) {
+  event.preventDefault();
+  if (event.button === 0) {
+    // 左键松开
+    isMoving = false;
+    socket.emit("player_move", { moving: 0 });
+    console.log("鼠标已松开");
+  }
+}
+
 // 处理触摸开始事件
 function handleTouchStart(event) {
   event.preventDefault();
@@ -1101,8 +1103,6 @@ function updateTouchPosition(touch) {
   }
 }
 
-// 添加鼠标按下事件监听器
-document.addEventListener("mousedown", handleMouseDown);
 // 阻止右键菜单弹出
 document.addEventListener(
   "contextmenu",
@@ -1111,15 +1111,6 @@ document.addEventListener(
   },
   false
 );
-
-// 处理鼠标松开事件
-function handleMouseUp(event) {
-  event.preventDefault();
-  if (event.button === 0) {
-    // 左键松开
-    isMoving = false;
-  }
-}
 
 // 处理玩家被击杀事件
 socket.on("player_killed", (data) => {
