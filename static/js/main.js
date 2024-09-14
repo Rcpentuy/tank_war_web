@@ -137,6 +137,11 @@ window.onload = function () {
       }
     });
 
+  document
+    .getElementById("gameOverModal")
+    .querySelector("button")
+    .addEventListener("click", restartGame);
+
   console.log("Window onload complete");
 };
 
@@ -279,30 +284,5 @@ function gameLoop(currentTime) {
     gameState.pendingWinner = null;
   }
 }
-
-// 这段代码添加了一个事件监听器，在DOM内容加载完成后执行
-document.addEventListener("DOMContentLoaded", () => {
-  // 获取游戏结束模态框中的重启按钮
-  const restartButton = document
-    .getElementById("gameOverModal")
-    .querySelector("button");
-
-  // 如果找到了重启按钮
-  if (restartButton) {
-    // 为重启按钮添加点击事件监听器，点击时调用restartGame函数
-    restartButton.addEventListener("click", restartGame);
-  }
-});
-// 这段代码的功能是：
-// 1. 确保在DOM完全加载后执行，避免找不到元素的问题
-// 2. 找到游戏结束模态框中的重启按钮
-// 3. 为重启按钮添加点击事件，使玩家可以通过点击按钮重新开始游戏
-// 4. 通过这种方式，实现了游戏结束后可以快速重新开始的功能
-
-// 将需要全局访问的函数挂载到window对象上
-// window.joinGame = joinGame;
-// window.startGame = startGame;
-// window.restartGame = restartGame;
-// window.drawPlayers = drawPlayers;
 
 export { gameLoop };
