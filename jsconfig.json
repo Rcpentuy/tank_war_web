@@ -1,5 +1,13 @@
 {
   "compilerOptions": {
-    "checkJs": true
+    "checkJs": true,
+    "strict": true,
+    "noImplicitAny": false,
+    "strictNullChecks": false,
+    "alwaysStrict": true,
+    "esModuleInterop": true,
+    "target": "ES6",
+    "module": "ESNext",
+    "moduleResolution": "node"
   }
 }
