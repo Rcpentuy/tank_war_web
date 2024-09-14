@@ -1,3 +1,5 @@
+import { gameState } from "./gameState.js";
+
 // 定义SVG命名空间
 const svgNS = "http://www.w3.org/2000/svg";
 
@@ -47,7 +49,12 @@ function lerpAngle(start, end, factor) {
 }
 
 function addExplosion(x, y) {
-  explosions.push({ x: x, y: y, frame: 0, startTime: performance.now() });
+  gameState.explosions.push({
+    x: x,
+    y: y,
+    frame: 0,
+    startTime: performance.now(),
+  });
 }
 
 export {

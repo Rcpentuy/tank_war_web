@@ -248,9 +248,9 @@ function gameLoop(currentTime) {
   // 检查玩家是否正在移动（通过鼠标或触摸）且玩家存在
   if (
     (gameState.isMoving || gameState.isTouchMoving) &&
-    gameState.players[myId]
+    gameState.players[gameState.myId]
   ) {
-    const player = gameState.players[myId];
+    const player = gameState.players[gameState.myId];
     // 计算玩家当前位置到目标位置的水平和垂直距离
     const dx = gameState.targetX - player.x;
     const dy = gameState.targetY - player.y;

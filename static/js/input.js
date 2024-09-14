@@ -1,6 +1,6 @@
-import { gameState, FIRE_COOLDOWN } from "./gameState";
-import { socket } from "./socket";
-import { joinGame } from "./gameLogic";
+import { gameState, FIRE_COOLDOWN } from "./gameState.js";
+import { socket } from "./socket.js";
+import { joinGame } from "./gameLogic.js";
 function handleMouseMove(event) {
   if (!gameState.gameArea || !gameState.maze_info) {
     console.error("gameArea or gameState.maze_info is not initialized");
@@ -97,8 +97,8 @@ function handleTouchEnd(event) {
     // 如果是移动状态，停止移动
     gameState.isTouchMoving = false;
     gameState.isMoving = false;
-    const currentAngle = gameState.players[myId]
-      ? gameState.players[myId].angle
+    const currentAngle = gameState.players[gameState.myId]
+      ? gameState.players[gameState.myId].angle
       : 0;
     socket.emit("player_move", { angle: currentAngle, moving: false });
   } else if (performance.now() - gameState.touchStartTime < 300) {
@@ -142,8 +142,8 @@ function updateTouchPosition(touch) {
 
   // 触发移动
   gameState.isMoving = true;
-  if (gameState.players[myId]) {
-    const player = gameState.players[myId];
+  if (gameState.players[gameState.myId]) {
+    const player = gameState.players[gameState.myId];
     const dx = gameState.targetX - player.x;
     const dy = gameState.targetY - player.y;
     const angle = Math.atan2(dy, dx);

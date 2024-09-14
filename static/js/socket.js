@@ -9,12 +9,19 @@ import {
 } from "./gameState.js";
 import { drawPlayers } from "./rendering.js";
 import {
-  showWaitingScreen,
   showJoinForm,
-  showGameOver,
-  updateScoreBoard,
-  updatePlayerList,
   showPlayerInfo,
+  resizeCanvas,
+  togglePlayerList,
+  updatePlayerList,
+  updateScoreBoard,
+  showChangeNameForm,
+  submitNewName,
+  cancelChangeName,
+  showWaitingScreen,
+  showGameOver,
+  adjustCanvasSize,
+  checkOrientation,
 } from "./ui.js";
 import { startGame } from "./gameLogic.js";
 import { addExplosion } from "./utils.js";
@@ -66,12 +73,12 @@ socket.on("rejoin_game", () => {
 });
 
 socket.on("game_reset", (data) => {
-  walls = data.walls;
-  maze_info = data.maze_info;
-  players = {};
-  bullets = [];
-  crystals = [];
-  wins = data.wins;
+  gameState.walls = data.walls;
+  gameState.maze_info = data.maze_info;
+  gameState.players = {};
+  gameState.bullets = [];
+  gameState.crystals = [];
+  gameState.wins = data.wins;
   adjustCanvasSize();
   updateScoreBoard();
   document.getElementById("gameOverModal").style.display = "none";
@@ -85,33 +92,34 @@ socket.on("game_reset", (data) => {
 });
 
 socket.on("player_joined", (data) => {
-  players = data.players;
-  walls = data.walls;
-  maze_info = data.maze_info;
-  wins = data.wins;
+  gameState.players = data.players;
+  gameState.walls = data.walls;
+  gameState.maze_info = data.maze_info;
+  gameState.wins = data.wins;
 
-  // 只在 myId 为 null 时设置它
-  if (myId === null) {
-    myId = data.id;
-    console.log("myId set to:", myId);
+  // 只在 gameState.myId 为 null 时设置它
+  if (gameState.myId === null) {
+    gameState.myId = data.id;
+    console.log("gameState.myId set to:", gameState.myId);
   }
 
   adjustCanvasSize();
   updateScoreBoard();
-  if (Object.keys(players).length > 1) {
+  if (Object.keys(gameState.players).length > 1) {
     startGame();
   } else {
     showWaitingScreen();
-    document.getElementById("currentPlayerCount").textContent =
-      Object.keys(players).length;
+    document.getElementById("currentPlayerCount").textContent = Object.keys(
+      gameState.players
+    ).length;
   }
-  playerLatencies = data.latencies || {};
+  gameState.playerLatencies = data.latencies || {};
   updatePlayerList();
 });
 
 socket.on("update_latencies", (latencies) => {
-  playerLatencies = latencies;
-  if (isPlayerListVisible) {
+  gameState.playerLatencies = latencies;
+  if (gameState.isPlayerListVisible) {
     updatePlayerList();
   }
 });
@@ -119,11 +127,11 @@ socket.on("update_latencies", (latencies) => {
 socket.on("player_left", (data) => {
   console.log("Player left:", data.id);
 
-  if (playerLatencies[data.id]) {
-    delete playerLatencies[data.id];
+  if (gameState.playerLatencies[data.id]) {
+    delete gameState.playerLatencies[data.id];
   }
-  if (players[data.id]) {
-    delete players[data.id];
+  if (gameState.players[data.id]) {
+    delete gameState.players[data.id];
     console.log("Player removed from local data");
   } else {
     console.log("Player not found in local data");
@@ -136,21 +144,21 @@ socket.on("update_player_count", (data) => {
   const playerCount = document.getElementById("playerCount");
   playerCount.textContent = `在线玩家: ${data.count}`;
   playerCount.title = `在线玩家:\n${data.players.join("\n")}`;
-  playerLatencies = data.latencies || {}; // 更新延迟信息
-  if (isPlayerListVisible) {
+  gameState.playerLatencies = data.latencies || {}; // 更新延迟信息
+  if (gameState.isPlayerListVisible) {
     updatePlayerList();
   }
 });
 
 socket.on("game_over", (data) => {
   console.log("游戏结束:", data);
-  wins = data.wins;
+  gameState.wins = data.wins;
   updateScoreBoard();
 
   // 检查是否有正在进行的爆炸动画
-  if (explosions.length > 0) {
-    gameOverPending = true;
-    pendingWinner = data.winner;
+  if (gameState.explosions.length > 0) {
+    gameState.gameOverPending = true;
+    gameState.pendingWinner = data.winner;
   } else {
     showGameOver(data.winner);
   }
@@ -159,15 +167,15 @@ socket.on("game_over", (data) => {
 socket.on("game_state", (binaryData) => {
   try {
     const decodedData = msgpack.decode(new Uint8Array(binaryData));
-    lastGameState = currentGameState;
-    currentGameState = decodedData;
-    lastUpdateTime = performance.now();
-    interpolationFactor = 0;
+    gameState.lastGameState = gameState.currentGameState;
+    gameState.currentGameState = decodedData;
+    gameState.lastUpdateTime = performance.now();
+    gameState.interpolationFactor = 0;
 
-    lasers = currentGameState.lasers;
+    gameState.lasers = gameState.currentGameState.lasers;
     // 移除不再存在的水晶
-    crystals = crystals.filter((crystal) =>
-      currentGameState.crystals.some(
+    gameState.crystals = gameState.crystals.filter((crystal) =>
+      gameState.currentGameState.crystals.some(
         (serverCrystal) =>
           serverCrystal.x === crystal.x && serverCrystal.y === crystal.y
       )
@@ -184,28 +192,28 @@ socket.on("crystal_spawned", (data) => {
     y: data.y,
     spawnTime: performance.now(),
   };
-  crystals.push(newCrystal);
-  console.log("Crystals after spawn:", crystals);
+  gameState.crystals.push(newCrystal);
+  console.log("Crystals after spawn:", gameState.crystals);
 });
 
 socket.on("crystal_collected", (data) => {
   console.log("Crystal collected:", data);
-  crystals = crystals.filter(
+  gameState.crystals = gameState.crystals.filter(
     (crystal) => crystal.x !== data.x || crystal.y !== data.y
   );
-  console.log("Crystals after collection:", crystals);
+  console.log("Crystals after collection:", gameState.crystals);
 });
 
 // 处理玩家被击杀事件
 socket.on("player_killed", (data) => {
   console.log("Player killed:", data);
-  if (players[data.id]) {
-    players[data.id].alive = false; // 更新玩家状态！！！
+  if (gameState.players[data.id]) {
+    gameState.players[data.id].alive = false; // 更新玩家状态！！！
   }
   addExplosion(data.x, data.y);
-  if (data.id === myId) {
+  if (data.id === gameState.myId) {
     console.log("You were killed!");
-    isMoving = false;
+    gameState.isMoving = false;
     socket.emit("player_move", { angle: 0, moving: false });
   }
   drawPlayers(); // 重新绘制以更新玩家状态
@@ -214,11 +222,11 @@ socket.on("player_killed", (data) => {
 // 处理名字更改事件
 socket.on("name_changed", (data) => {
   console.log("Name changed:", data);
-  if (data.id === myId) {
+  if (data.id === gameState.myId) {
     showPlayerInfo(data.new_name);
   }
-  players[data.id].name = data.new_name;
-  players[data.id].color = data.new_color;
+  gameState.players[data.id].name = data.new_name;
+  gameState.players[data.id].color = data.new_color;
   updateScoreBoard();
 });
 

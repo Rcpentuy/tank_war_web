@@ -1,3 +1,7 @@
+import { gameState } from "./gameState.js";
+import { socket } from "./socket.js";
+import { logElementState } from "./utils.js";
+
 // 显示加入游戏表单
 function showJoinForm() {
   console.log("Showing join form");
@@ -11,7 +15,7 @@ function showJoinForm() {
   if (gameArea) gameArea.style.display = "none";
   if (waitingModal) waitingModal.style.display = "none";
 
-  gameState = "not_joined";
+  gameState.gameState = "not_joined";
 
   // 添加这些调试日志
   logElementState("joinForm");
@@ -30,22 +34,29 @@ function showPlayerInfo(name) {
 
 // 调整画布大小
 function resizeCanvas() {
-  if (maze_info && maze_info.width && maze_info.height) {
+  if (
+    gameState.maze_info &&
+    gameState.maze_info.width &&
+    gameState.maze_info.height
+  ) {
     const scale = Math.min(
-      window.innerWidth / maze_info.width,
-      window.innerHeight / maze_info.height
+      window.innerWidth / gameState.maze_info.width,
+      window.innerHeight / gameState.maze_info.height
     );
-    gameArea.setAttribute("width", maze_info.width * scale);
-    gameArea.setAttribute("height", maze_info.height * scale);
+    gameState.gameArea.setAttribute("width", gameState.maze_info.width * scale);
+    gameState.gameArea.setAttribute(
+      "height",
+      gameState.maze_info.height * scale
+    );
   }
 }
 
 // 切换玩家列表显示
 function togglePlayerList() {
-  isPlayerListVisible = !isPlayerListVisible;
+  gameState.isPlayerListVisible = !gameState.isPlayerListVisible;
   const playerList = document.getElementById("playerList");
-  playerList.style.display = isPlayerListVisible ? "block" : "none";
-  if (isPlayerListVisible) {
+  playerList.style.display = gameState.isPlayerListVisible ? "block" : "none";
+  if (gameState.isPlayerListVisible) {
     updatePlayerList();
   }
 }
@@ -54,10 +65,12 @@ function togglePlayerList() {
 function updatePlayerList() {
   const playerList = document.getElementById("playerList");
   let listHtml = "<h3>在线玩家</h3>";
-  for (let id in players) {
+  for (let id in gameState.players) {
     const latency =
-      playerLatencies[id] !== undefined ? playerLatencies[id] : "未知";
-    listHtml += `<p>${players[id].name}: ${latency}ms</p>`;
+      gameState.playerLatencies[id] !== undefined
+        ? gameState.playerLatencies[id]
+        : "未知";
+    listHtml += `<p>${gameState.players[id].name}: ${latency}ms</p>`;
   }
   playerList.innerHTML = listHtml;
 }
@@ -66,10 +79,12 @@ function updateScoreBoard() {
   const scoreBoard = document.getElementById("scoreBoard");
   if (scoreBoard) {
     let scoreHtml = "<h3>胜利榜</h3>";
-    let sortedPlayers = Object.entries(wins).sort((a, b) => b[1] - a[1]);
+    let sortedPlayers = Object.entries(gameState.wins).sort(
+      (a, b) => b[1] - a[1]
+    );
     for (let [id, winCount] of sortedPlayers) {
-      if (players[id]) {
-        scoreHtml += `<p>${players[id].name}: ${winCount}胜</p>`;
+      if (gameState.players[id]) {
+        scoreHtml += `<p>${gameState.players[id].name}: ${winCount}胜</p>`;
       }
     }
     scoreBoard.innerHTML = scoreHtml;
@@ -114,7 +129,7 @@ function showWaitingScreen() {
   document.getElementById("gameInfo").style.display = "flex";
   document.getElementById("gameArea").style.display = "none";
   document.getElementById("waitingModal").style.display = "block";
-  gameState = "waiting";
+  gameState.gameState = "waiting";
 }
 
 // 显示游戏结束界面
@@ -130,17 +145,21 @@ function showGameOver(winner) {
     gameOverModal.style.display = "block";
   }
 
-  isGameRunning = false;
+  gameState.isGameRunning = false;
 }
 
 function adjustCanvasSize() {
-  if (maze_info && maze_info.width && maze_info.height) {
-    gameArea.setAttribute("width", maze_info.width);
-    gameArea.setAttribute("height", maze_info.height);
-    gameArea.style.position = "absolute";
-    gameArea.style.left = "50%";
-    gameArea.style.top = "50%";
-    gameArea.style.transform = "translate(-50%, -50%)";
+  if (
+    gameState.maze_info &&
+    gameState.maze_info.width &&
+    gameState.maze_info.height
+  ) {
+    gameState.gameArea.setAttribute("width", gameState.maze_info.width);
+    gameState.gameArea.setAttribute("height", gameState.maze_info.height);
+    gameState.gameArea.style.position = "absolute";
+    gameState.gameArea.style.left = "50%";
+    gameState.gameArea.style.top = "50%";
+    gameState.gameArea.style.transform = "translate(-50%, -50%)";
   }
 }
 
