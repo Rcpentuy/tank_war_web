@@ -285,4 +285,5 @@ function gameLoop(currentTime) {
   }
 }
 
+window.gameState = gameState;
 export { gameLoop };

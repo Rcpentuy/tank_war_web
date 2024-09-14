@@ -1,8 +1,8 @@
 from app import socketio
 from flask import request
 from flask_socketio import emit
-from game_state import players, bullets, walls, maze_info, wins, player_latencies, player_colors, TANK_WIDTH, TANK_HEIGHT, TANK_SPEED
-from game_logic import respawn_player, check_game_state, reset_game, reflect_laser
+from game_state import players, bullets,crystals, walls, maze_info, wins, player_latencies, player_colors,is_game_running, TANK_WIDTH, TANK_HEIGHT, TANK_SPEED
+from game_logic import respawn_player, check_game_state, reflect_laser
 from utils import circle_rectangle_collision
 from game_logic import lasers, generate_walls
 import random
@@ -15,6 +15,7 @@ def handle_player_join(data):
     if player_id in players:
         # 玩家已经存在，可能是重新连接
         players[player_id]['name'] = data['name']
+        players[player_id]['moving'] = 0
     else:
         # 新玩家加入
         if player_id not in player_colors:
@@ -32,7 +33,8 @@ def handle_player_join(data):
         }
         if player_id not in wins:
             wins[player_id] = 0  # 初始化玩家胜利次数
-    respawn_player(player_id)
+        #确保只重生新加入玩家
+        respawn_player(player_id)
     player_latencies[player_id] = 0  # 初始化延迟
     
     # 向新加入的玩家发送他们自己的 ID
@@ -49,7 +51,7 @@ def handle_disconnect():
     player_id = request.sid
     if player_id in players:
         del players[player_id]
-        print(f'Player {player_id} disconnected, current players: {players}')
+        print(f'玩家{player_id}断开连接')
         if player_id in wins:
             del wins[player_id]
         if player_id in player_latencies:
@@ -63,7 +65,7 @@ def handle_disconnect():
 
 @socketio.on('connect_error')
 def handle_connect_error(error):
-    print(f"Connection error: {error}")
+    print(f"发现连接错误: {error}")
     handle_disconnect()  # 调用断开连接的处理函数
 
 @socketio.on('change_name')
@@ -103,7 +105,7 @@ def handle_fire():
     current_time = time.time()
     
     # 坦克中心到炮口的距离
-    barrel_length = max(TANK_WIDTH, TANK_HEIGHT) / 2 + 3  # 确保子弹在坦克外部生成
+    barrel_length = max(TANK_WIDTH, TANK_HEIGHT) / 2 + 4  # 确保子弹在坦克外部生成
     
     # 计算炮口位置
     fire_start_x = player['x'] + math.cos(player['angle']) * barrel_length
@@ -150,15 +152,18 @@ def handle_latency(data):
 
 @socketio.on('restart_game')
 def handle_restart_game():
-    global maze_info
-    if not maze_info:
-        generate_walls()  # 如果 maze_info 为空，重新生成墙壁
-    global players, bullets
-    players.clear()
-    bullets.clear()
-    generate_walls()
-    socketio.emit('game_reset', {'walls': walls, 'maze_info': maze_info, 'wins': wins}, namespace='/')
-    print("Game restarted")  # 添加这行来帮助调试
-
-    # 让所有连接的客户端重新加入游戏
-    socketio.emit('rejoin_game', namespace='/')
+    global players
+    alive_players = [player for player in players.values() if player['alive']]
+    if len(alive_players) <= 1:
+        print('现有玩家：',alive_players)
+        global bullets,crystals
+        generate_walls()
+        bullets.clear()
+        crystals.clear()
+        for player_id in list(players.keys()):
+            respawn_player(player_id)
+        socketio.emit('game_reset', {'walls': walls, 'players': players, 'maze_info': maze_info, 'wins': wins}, namespace='/')
+        socketio.emit('rejoin_game', namespace='/')
+    else:
+        emit('rejoin_game', namespace='/')
+        print('还有2名以上玩家存活，正在连接会话...')

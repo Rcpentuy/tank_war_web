@@ -242,7 +242,7 @@ function measureLatency() {
   });
 }
 
-// 页面卸载前断开socket连接
+// 页面卸载前断开socket连接,能够清除后台连接的玩家
 window.addEventListener("beforeunload", () => {
   socket.disconnect();
 });

@@ -5,13 +5,13 @@ import random
 import time
 from utils import circle_rectangle_collision, generate_maze,line_rectangle_intersection,line_rectangle_collision
 from msgpack import packb
+from flask_socketio import emit
 from threading import Thread
 
 def update_game():
     global is_game_running, bullets, crystals, last_crystal_spawn_time, lasers
     if not is_game_running:
         check_game_state()
-
     current_time = time.time()
     
     # 更新玩家位置和角度
@@ -170,18 +170,38 @@ def check_game_state():
     else:
         # 如果没有玩家，重置游戏状态
         is_game_running = False
-        reset_game()
 
-def reset_game():
-    global players, bullets
-    generate_walls()
-    bullets.clear()
-    crystals.clear()
-    for player_id in list(players.keys()):
-        respawn_player(player_id)
-    socketio.emit('game_reset', {'walls': walls, 'players': players, 'maze_info': maze_info, 'wins': wins}, namespace='/')
-
+# def reset_game():
+#     global players
+#     alive_players = [player for player in players.values() if player['alive']]
+#     if len(alive_players) <= 1:
+#         print('现有玩家：',alive_players)
+#         global bullets
+#         generate_walls()
+#         bullets.clear()
+#         crystals.clear()
+#         for player_id in list(players.keys()):
+#             respawn_player(player_id)
+#         socketio.emit('game_reset', {'walls': walls, 'players': players, 'maze_info': maze_info, 'wins': wins}, namespace='/')
+#         socketio.emit('rejoin_game', namespace='/')
+#     else:
+#         emit('rejoin_game', namespace='/')
+#         print('还有2名以上玩家存活，正在连接会话...')
+        
 def respawn_player(player_id):
+    '''
+    重生玩家的函数
+    
+    参数:
+    player_id (str): 需要重生的玩家ID
+    
+    功能:
+    1. 检查并确保迷宫信息存在
+    2. 计算迷宫的边界
+    3. 计算坦克的碰撞半径
+    4. 在迷宫内随机选择一个不与墙壁碰撞的位置
+    5. 更新玩家的位置、角度和存活状态
+    '''
     global maze_info
     if not maze_info:
         generate_walls()  # 如果 maze_info 为空，重新生成墙壁
