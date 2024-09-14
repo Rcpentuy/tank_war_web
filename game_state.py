@@ -43,7 +43,7 @@ LASER_DURATION = 10  # 激光武器持续时间为10秒
 
 # 游戏更新频率
 GAME_UPDATE_RATE = 60  # 60 FPS
-GAME_STATE_SEND_RATE = 20  # 20 FPS
+GAME_STATE_SEND_RATE = 60  # 20 FPS
 
 # 初始化日志
 import logging

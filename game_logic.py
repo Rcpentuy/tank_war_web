@@ -146,10 +146,10 @@ def send_game_state():
 def start_game_loop():
     update_counter = 0
     while True:
-        socketio.sleep(1/60)  # 60 FPS 的游戏逻辑
+        socketio.sleep(1/GAME_UPDATE_RATE)  # GAME_UPDATE_RATE FPS 的游戏逻辑
         update_game()
         update_counter += 1
-        if update_counter >= 3:  # 每3帧发送一次更新，相当于20 FPS
+        if update_counter >= GAME_UPDATE_RATE/GAME_STATE_SEND_RATE:  # 每隔多少帧发送一次更新，相当于 GAME_STATE_SEND_RATE FPS
             update_counter = 0
             send_game_state()
 
