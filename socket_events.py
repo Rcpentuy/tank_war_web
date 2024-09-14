@@ -16,6 +16,7 @@ def handle_player_join(data):
         # 玩家已经存在，可能是重新连接
         players[player_id]['name'] = data['name']
         players[player_id]['moving'] = 0
+        players[player_id]['laser_end_time'] = 0
     else:
         # 新玩家加入
         if player_id not in player_colors:

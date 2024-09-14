@@ -135,7 +135,7 @@ def send_game_state():
             'alive': p['alive'],
             'color': p['color'],
             'name': p['name'],
-            'has_laser': time.time() <= p.get('laser_end_time', 0)
+            'has_laser': time.time() <= p.get('laser_end_time', 0)  # 检查玩家是否拥有激光武器。通过比较当前时间和激光结束时间来判断。
         } for id, p in players.items()},
         'bullets': [{'x': b['x'], 'y': b['y'], 'angle': b['angle'], 'speed': 5, 'id': id(b)} for b in bullets],
         'crystals': [{'x': c['x'], 'y': c['y'], 'spawn_time': c['spawn_time']} for c in crystals],
