@@ -119,7 +119,6 @@ def handle_fire():
             'creation_time': current_time
         }
         laser = reflect_laser(laser,walls)
-        print('反射之后：',laser)
         lasers.append(laser)
     else:
         # 发射普通子弹

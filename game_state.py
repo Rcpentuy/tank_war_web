@@ -27,6 +27,7 @@ LASER_DURATION = 10  # 10秒
 CRYSTAL_RADIUS = 15  # 水晶半径
 TANK_CRYSTAL_MIN_DISTANCE = 100  # 坦克和水晶之间的最小距离
 REFLECTION_TIMES = 3 #激光反弹次数
+LASER_EXPIRATION_TIME = 0.1 #激光被移除的时间
 
 # 初始化最后一次水晶生成时间
 import time
@@ -35,7 +36,7 @@ last_crystal_spawn_time = time.time()
 
 # 游戏设置
 BULLET_SPEED = 5
-TANK_SPEED = 1.5
+TANK_SPEED = 2
 ROTATING_SPEED = 0.05  # 每帧旋转的弧度
 MAX_BULLET_BOUNCES = 10
 LASER_DURATION = 10  # 激光武器持续时间为10秒

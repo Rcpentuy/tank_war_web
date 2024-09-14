@@ -521,6 +521,10 @@ socket.on("game_start", () => {
   updatePlayerList(); // 添加这行
 });
 
+socket.on("waiting_for_players", () => {
+  showWaitingScreen();
+});
+
 // 添加这个事件监听器
 socket.on("rejoin_game", () => {
   const savedName = localStorage.getItem("playerName");
@@ -912,8 +916,8 @@ function drawLaser() {
 
     const laserPath = createSVGElement("path", {
       d: pathData,
-      stroke: "lightskyblue",
-      "stroke-width": "2",
+      stroke: "mediumblue",
+      "stroke-width": "3",
       fill: "none",
     });
 

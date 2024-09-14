@@ -61,7 +61,7 @@ def update_game():
 
     bullets_to_remove = []
     for bullet in bullets:
-        speed = 5
+        speed = BULLET_SPEED
         dx = math.cos(bullet['angle']) * speed
         dy = math.sin(bullet['angle']) * speed
         
@@ -110,7 +110,7 @@ def update_game():
     # 更新激光
     lasers_to_remove = []
     for laser in lasers:
-        if current_time - laser['creation_time'] > 0.1:  # 激光持续时间为0.1秒
+        if current_time - laser['creation_time'] > LASER_EXPIRATION_TIME:  # 激光持续时间为0.1秒
             lasers_to_remove.append(laser)
         hit_players = process_laser(laser)
         for player_id in hit_players:
@@ -334,15 +334,11 @@ def process_laser(laser):
 def reflect_laser(laser, walls):
     reflected_points = []
     current_x, current_y = laser['x'], laser['y']
-    angle = laser['angle']
-    
-    print(f"Initial laser position: ({current_x}, {current_y}), angle: {angle}")
+    angle = laser['angle'] 
     
     for i in range(REFLECTION_TIMES):
         dx = math.cos(angle)
         dy = math.sin(angle)
-        
-        print(f"Reflection {i+1}: direction vector: ({dx}, {dy})")
         
         min_distance = float('inf')
         collision_point = None
@@ -357,7 +353,6 @@ def reflect_laser(laser, walls):
                     min_distance = distance
                     collision_point = intersection
                     collision_wall = wall
-                print(f"  Intersection with wall {wall}: {intersection}")
         
         # 如果没有找到交点，检查与游戏边界的交点
         if not collision_point:
@@ -375,7 +370,6 @@ def reflect_laser(laser, walls):
                         min_distance = distance
                         collision_point = intersection
                         collision_wall = bound
-                    print(f"  Intersection with game boundary {bound}: {intersection}")
         
         if collision_point:
             reflected_points.append(collision_point)
@@ -386,11 +380,7 @@ def reflect_laser(laser, walls):
                 angle = 2 * math.pi - angle
             else:  # 垂直墙
                 angle = math.pi - angle
-            
-            print(f"  Collision at {collision_point}, new angle: {angle}")
-        else:
-            print("  No collision found, this should not happen!")
-            break
+                
     
     laser['reflected_points'] = reflected_points
     return laser
