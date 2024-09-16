@@ -43,6 +43,7 @@ import {
   toggleJoystick,
   setJoystickEnabled,
   handleFireButtonClick,
+  disableScrolling,
 } from "./input.js";
 
 // 页面加载完成后的初始化
@@ -134,6 +135,7 @@ window.onload = function () {
     initJoystick();
     showJoystick();
     showFireButton();
+    disableScrolling();
     console.log("摇杆已显示");
     // 添加开火按钮的事件监听器
     const fireButton = document.getElementById("fireButton");

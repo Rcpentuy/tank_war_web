@@ -106,7 +106,7 @@ def handle_fire():
     current_time = time.time()
     
     # 坦克中心到炮口的距离
-    barrel_length = max(TANK_WIDTH, TANK_HEIGHT) / 2 + 4  # 确保子弹在坦克外部生成
+    barrel_length = max(TANK_WIDTH, TANK_HEIGHT) / 2 + 5  # 确保子弹在坦克外部生成
     
     # 计算炮口位置
     fire_start_x = player['x'] + math.cos(player['angle']) * barrel_length

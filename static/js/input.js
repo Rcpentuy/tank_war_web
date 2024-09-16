@@ -183,9 +183,11 @@ function toggleJoystick() {
   console.log("摇杆状态" + joystickEnabled);
   if (joystickEnabled) {
     showJoystick();
+    showFireButton();
     disableScrolling();
   } else {
     hideJoystick();
+    hideFireButton();
     enableScrolling();
   }
 }
@@ -233,4 +235,5 @@ export {
   toggleJoystick,
   setJoystickEnabled,
   handleFireButtonClick,
+  disableScrolling,
 };
