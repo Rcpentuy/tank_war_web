@@ -26,6 +26,9 @@ import {
   showGameOver,
   adjustCanvasSize,
   checkOrientation,
+  initJoystick,
+  showJoystick,
+  hideJoystick,
 } from "./ui.js";
 import {
   handleMouseMove,
@@ -36,6 +39,7 @@ import {
   handleTouchEnd,
   handleEnterKey,
 } from "./input.js";
+
 // 页面加载完成后的初始化
 window.onload = function () {
   setInterval(measureLatency, 5000); // 每5秒测量一次延迟
@@ -118,6 +122,12 @@ window.onload = function () {
     console.log("Player name input event listener added");
   } else {
     console.error("Player name input not found");
+  }
+
+  if (isMobileDevice()) {
+    initJoystick();
+    showJoystick();
+    console.log("摇杆已显示");
   }
 
   // 添加这些调试日志
@@ -295,5 +305,14 @@ function gameLoop(currentTime) {
   }
 }
 
+function isMobileDevice() {
+  console.log("检测是否是移动设备");
+  return /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(
+    navigator.userAgent
+  );
+}
+
 window.gameState = gameState;
+window.showJoystick = showJoystick;
+window.isMobileDevice = isMobileDevice;
 export { gameLoop };

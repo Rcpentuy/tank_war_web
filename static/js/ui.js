@@ -194,3 +194,81 @@ export {
   adjustCanvasSize,
   checkOrientation,
 };
+
+function initJoystick() {
+  const joystickContainer = document.getElementById("joystickContainer");
+  const joystick = document.getElementById("joystick");
+  let isDragging = false;
+  let centerX, centerY;
+
+  function handleStart(e) {
+    isDragging = true;
+    const touch = e.touches ? e.touches[0] : e;
+    centerX = joystickContainer.offsetLeft + joystickContainer.offsetWidth / 2;
+    centerY = joystickContainer.offsetTop + joystickContainer.offsetHeight / 2;
+    updateJoystickPosition(touch.clientX, touch.clientY);
+  }
+
+  function handleMove(e) {
+    if (!isDragging) return;
+    const touch = e.touches ? e.touches[0] : e;
+    updateJoystickPosition(touch.clientX, touch.clientY);
+  }
+
+  function handleEnd() {
+    isDragging = false;
+    joystick.style.transform = "translate(-50%, -50%)";
+    socket.emit("player_move", { moving: 0, rotating: 0 });
+  }
+
+  function updateJoystickPosition(x, y) {
+    const deltaX = x - centerX;
+    const deltaY = y - centerY;
+    const distance = Math.min(
+      joystickContainer.offsetWidth / 2,
+      Math.sqrt(deltaX * deltaX + deltaY * deltaY)
+    );
+    const angle = Math.atan2(deltaY, deltaX);
+    const joystickX = distance * Math.cos(angle);
+    const joystickY = distance * Math.sin(angle);
+
+    joystick.style.transform = `translate(${joystickX}px, ${joystickY}px)`;
+
+    // 发送移动指令
+    const moving = distance > 10 ? 1 : 0;
+    const rotating = angle;
+    socket.emit("player_move", { moving, rotating });
+  }
+
+  joystickContainer.addEventListener("touchstart", handleStart);
+  joystickContainer.addEventListener("touchmove", handleMove);
+  joystickContainer.addEventListener("touchend", handleEnd);
+}
+
+function showJoystick() {
+  const joystickContainer = document.getElementById("joystickContainer");
+  joystickContainer.style.display = "block";
+}
+
+function hideJoystick() {
+  const joystickContainer = document.getElementById("joystickContainer");
+  joystickContainer.style.display = "none";
+}
+
+// 在适当的地方调用 initJoystick() 和 showJoystick()
+// 例如，在游戏开始时或检测到移动设备时
+
+// 添加射击功能
+document.addEventListener("touchstart", function (e) {
+  if (e.target.id !== "joystick" && e.target.id !== "joystickContainer") {
+    socket.emit("fire");
+  }
+});
+
+// ... 导出新函数 ...
+export {
+  // ... 现有导出 ...
+  initJoystick,
+  showJoystick,
+  hideJoystick,
+};
