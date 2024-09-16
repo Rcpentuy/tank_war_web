@@ -137,6 +137,16 @@ window.onload = function () {
       }
     });
 
+  // 添加提交新名字按钮的点击事件监听器
+  document
+    .getElementById("submitNameButton")
+    .addEventListener("click", submitNewName);
+
+  // 添加取消更改名字按钮的点击事件监听器
+  document
+    .getElementById("cancelNameButton")
+    .addEventListener("click", cancelChangeName);
+
   document
     .getElementById("gameOverModal")
     .querySelector("button")

@@ -48,9 +48,7 @@
       <div id="playerInfoContainer">
         <div id="playerInfo">
           玩家名: <span id="playerNameDisplay"></span>
-          <button id="changeNameButton" onclick="showChangeNameForm()">
-            更改名字
-          </button>
+          <button id="changeNameButton">更改名字</button>
         </div>
       </div>
       <br />
@@ -76,8 +74,8 @@
 
     <div id="changeNameForm" style="display: none">
       <input type="text" id="newPlayerName" placeholder="输入新的名字" />
-      <button onclick="submitNewName()">确认</button>
-      <button onclick="cancelChangeName()">取消</button>
+      <button id="submitNameButton">确认</button>
+      <button id="cancelNameButton">取消</button>
     </div>
 
     <div id="waitingModal" style="display: none">
