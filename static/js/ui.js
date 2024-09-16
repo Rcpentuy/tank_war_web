@@ -255,16 +255,6 @@ function hideJoystick() {
   joystickContainer.style.display = "none";
 }
 
-// 在适当的地方调用 initJoystick() 和 showJoystick()
-// 例如，在游戏开始时或检测到移动设备时
-
-// 添加射击功能
-// document.addEventListener("touchstart", function (e) {
-//   if (e.target.id !== "joystick" && e.target.id !== "joystickContainer") {
-//     socket.emit("fire");
-//   }
-// });
-
 // ... 导出新函数 ...
 export {
   // ... 现有导出 ...
