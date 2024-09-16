@@ -7,6 +7,7 @@ from utils import circle_rectangle_collision, generate_maze,line_rectangle_inter
 from msgpack import packb
 from flask_socketio import emit
 from threading import Thread
+from console_commands import ai_players
 
 def update_game():
     global is_game_running, bullets, crystals, last_crystal_spawn_time, lasers
@@ -126,6 +127,13 @@ def update_game():
     for laser in lasers_to_remove:
         lasers.remove(laser)
 
+    # 更新 AI 玩家
+    for ai_player in list(ai_players.values()):
+        if ai_player.player_id in players and players[ai_player.player_id]['alive']:
+            ai_player.update()
+        else:
+            del ai_players[ai_player.player_id]
+
 def send_game_state():
     game_state = {
         'players': {id: {
@@ -170,6 +178,8 @@ def check_game_state():
     else:
         # 如果没有玩家，重置游戏状态
         is_game_running = False
+
+
 
 # def reset_game():
 #     global players
