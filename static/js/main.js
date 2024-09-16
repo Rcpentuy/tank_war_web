@@ -38,6 +38,8 @@ import {
   handleTouchMove,
   handleTouchEnd,
   handleEnterKey,
+  toggleJoystick,
+  setJoystickEnabled,
 } from "./input.js";
 
 // 页面加载完成后的初始化
@@ -125,6 +127,7 @@ window.onload = function () {
   }
 
   if (isMobileDevice()) {
+    setJoystickEnabled(true);
     initJoystick();
     showJoystick();
     console.log("摇杆已显示");
@@ -161,6 +164,9 @@ window.onload = function () {
     .getElementById("gameOverModal")
     .querySelector("button")
     .addEventListener("click", restartGame);
+  document
+    .getElementById("toggleJoystick")
+    .addEventListener("click", toggleJoystick);
 
   console.log("Window onload complete");
 };

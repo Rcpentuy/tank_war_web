@@ -1,6 +1,10 @@
 import { gameState, FIRE_COOLDOWN } from "./gameState.js";
 import { socket } from "./socket.js";
 import { joinGame } from "./gameLogic.js";
+import { showJoystick, hideJoystick } from "./ui.js";
+
+let joystickEnabled = false;
+
 function handleMouseMove(event) {
   if (!gameState.gameArea || !gameState.maze_info) {
     console.error("gameArea or gameState.maze_info is not initialized");
@@ -68,6 +72,7 @@ function handleMouseUp(event) {
 
 // 处理触摸开始事件
 function handleTouchStart(event) {
+  if (joystickEnabled) return;
   event.preventDefault();
   const touch = event.touches[0];
   gameState.touchStartTime = performance.now();
@@ -81,6 +86,7 @@ function handleTouchStart(event) {
 
 // 处理触摸移动事件
 function handleTouchMove(event) {
+  if (joystickEnabled) return;
   event.preventDefault();
   if (gameState.isTouchMoving) {
     const touch = event.touches[0];
@@ -166,6 +172,38 @@ document.addEventListener(
   },
   false
 );
+
+function toggleJoystick() {
+  joystickEnabled = !joystickEnabled;
+  console.log("摇杆状态" + joystickEnabled);
+  if (joystickEnabled) {
+    showJoystick();
+    disableScrolling();
+  } else {
+    hideJoystick();
+    enableScrolling();
+  }
+}
+
+function disableScrolling() {
+  document.body.style.overflow = "hidden";
+  document.addEventListener("touchmove", preventDefaultScroll, {
+    passive: false,
+  });
+}
+
+function enableScrolling() {
+  document.body.style.overflow = "";
+  document.removeEventListener("touchmove", preventDefaultScroll);
+}
+
+function preventDefaultScroll(e) {
+  e.preventDefault();
+}
+
+function setJoystickEnabled(value) {
+  joystickEnabled = value;
+}
 // 导出所有函数
 export {
   handleMouseMove,
@@ -175,4 +213,6 @@ export {
   handleTouchMove,
   handleTouchEnd,
   handleEnterKey,
+  toggleJoystick,
+  setJoystickEnabled,
 };
