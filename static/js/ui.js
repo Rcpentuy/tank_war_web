@@ -218,7 +218,7 @@ function initJoystick() {
   function handleEnd() {
     isDragging = false;
     joystick.style.transform = "translate(-50%, -50%)";
-    socket.emit("player_move", { moving: 0, rotating: 0 });
+    socket.emit("player_move", { moving: 0 });
   }
 
   function updateJoystickPosition(x, y) {
@@ -237,7 +237,7 @@ function initJoystick() {
     // 发送移动指令
     const moving = distance > 10 ? 1 : 0;
     const rotating = angle;
-    socket.emit("player_move", { moving, rotating });
+    socket.emit("player_move", { angle: angle, moving: moving });
   }
 
   joystickContainer.addEventListener("touchstart", handleStart);
@@ -259,11 +259,11 @@ function hideJoystick() {
 // 例如，在游戏开始时或检测到移动设备时
 
 // 添加射击功能
-document.addEventListener("touchstart", function (e) {
-  if (e.target.id !== "joystick" && e.target.id !== "joystickContainer") {
-    socket.emit("fire");
-  }
-});
+// document.addEventListener("touchstart", function (e) {
+//   if (e.target.id !== "joystick" && e.target.id !== "joystickContainer") {
+//     socket.emit("fire");
+//   }
+// });
 
 // ... 导出新函数 ...
 export {
