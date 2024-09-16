@@ -1,7 +1,12 @@
 import { gameState, FIRE_COOLDOWN } from "./gameState.js";
 import { socket } from "./socket.js";
 import { joinGame } from "./gameLogic.js";
-import { showJoystick, hideJoystick } from "./ui.js";
+import {
+  showJoystick,
+  hideJoystick,
+  showFireButton,
+  hideFireButton,
+} from "./ui.js";
 
 let joystickEnabled = false;
 
@@ -204,6 +209,18 @@ function preventDefaultScroll(e) {
 function setJoystickEnabled(value) {
   joystickEnabled = value;
 }
+
+function handleFireButtonClick() {
+  const currentTime = performance.now();
+  if (currentTime - gameState.lastFireTime >= FIRE_COOLDOWN) {
+    console.log("Attempting to fire");
+    socket.emit("fire");
+    gameState.lastFireTime = currentTime;
+  } else {
+    console.log("Fire on cooldown");
+  }
+}
+
 // 导出所有函数
 export {
   handleMouseMove,
@@ -215,4 +232,5 @@ export {
   handleEnterKey,
   toggleJoystick,
   setJoystickEnabled,
+  handleFireButtonClick,
 };

@@ -255,10 +255,22 @@ function hideJoystick() {
   joystickContainer.style.display = "none";
 }
 
+function showFireButton() {
+  const fireButtonContainer = document.getElementById("fireButtonContainer");
+  fireButtonContainer.style.display = "flex";
+}
+
+function hideFireButton() {
+  const fireButtonContainer = document.getElementById("fireButtonContainer");
+  fireButtonContainer.style.display = "none";
+}
+
 // ... 导出新函数 ...
 export {
   // ... 现有导出 ...
   initJoystick,
   showJoystick,
   hideJoystick,
+  showFireButton,
+  hideFireButton,
 };

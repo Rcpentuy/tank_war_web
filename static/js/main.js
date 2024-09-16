@@ -29,6 +29,8 @@ import {
   initJoystick,
   showJoystick,
   hideJoystick,
+  showFireButton,
+  hideFireButton,
 } from "./ui.js";
 import {
   handleMouseMove,
@@ -40,6 +42,7 @@ import {
   handleEnterKey,
   toggleJoystick,
   setJoystickEnabled,
+  handleFireButtonClick,
 } from "./input.js";
 
 // 页面加载完成后的初始化
@@ -130,7 +133,11 @@ window.onload = function () {
     setJoystickEnabled(true);
     initJoystick();
     showJoystick();
+    showFireButton();
     console.log("摇杆已显示");
+    // 添加开火按钮的事件监听器
+    const fireButton = document.getElementById("fireButton");
+    fireButton.addEventListener("touchstart", handleFireButtonClick);
   }
 
   // 添加这些调试日志

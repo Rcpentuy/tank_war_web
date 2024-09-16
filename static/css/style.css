@@ -292,3 +292,32 @@ button {
   border-radius: 50%;
   transform: translate(-50%, -50%);
 }
+
+#fireButtonContainer {
+  position: fixed;
+  bottom: 20px;
+  right: 20px;
+  width: 100px;
+  height: 100px;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+#fireButton {
+  width: 80px;
+  height: 80px;
+  background-color: #ff4136;
+  border: none;
+  border-radius: 50%;
+  color: white;
+  font-size: 16px;
+  font-weight: bold;
+  cursor: pointer;
+  outline: none;
+  transition: background-color 0.3s;
+}
+
+#fireButton:active {
+  background-color: #d50000;
+}
